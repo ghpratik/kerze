@@ -240,6 +240,67 @@ def sub(a: Tensor, b: Tensor) -> Tensor:
     out._backward = _backward
     return out
 
+def div(a: Tensor, b: Tensor) -> Tensor:
+    """
+    Elementwise division of two same-shaped Tensors: out = a / b.
+
+    Forward:
+        out[i] = a[i] / b[i]  for every element i
+
+    Backward (quotient rule, applied elementwise):
+        d(out)/d(a) = 1/b, so gradient flowing to `a` is (incoming_grad * 1/b).
+        d(out)/d(b) = -a/b**2, so gradient flowing to `b` is (incoming_grad * -a/b**2).
+
+    Args:
+        a: First operand.
+        b: Second operand. Must have the same shape as `a` (no
+            broadcasting support yet).
+    
+    Returns:
+        A new Tensor holding `a.data / b.data` (elementwise), with
+        `requires_grad=True` if either input requires grad, and a
+        `_backward` closure wired to accumulate gradient into both
+        `a` and `b` using the quotient rule.
+
+    Raises:
+        ValueError: If `a.shape != b.shape`.
+
+    Example:
+        >>> a = Tensor([2.0, 6.0], requires_grad=True)
+        >>> b = Tensor([4.0, 3.0], requires_grad=True)
+        >>> out = div(a, b)
+        >>> out.data.data
+        [0.5, 2.0]
+    """
+    if a.shape != b.shape:
+        raise ValueError(
+            f"div: shape mismatch {a.shape} vs {b.shape} "
+            f"(broadcasting not yet supported)"
+        )
+
+    out_data = a.data / b.data
+    out = Tensor(
+        out_data,
+        requires_grad=(a.requires_grad or b.requires_grad),
+        _children=(a, b),
+        _op="div",
+    )
+
+    def _backward() -> None:
+        # Quotient rule: gradient into `a` is scaled by `1/b`, and
+        # gradient into `b` is scaled by `-a/b**2`.
+        if a.requires_grad:
+            if a.grad is None:
+                a.zero_grad()
+            a.grad += (1 / b.data) * out.grad
+        if b.requires_grad:
+            if b.grad is None:
+                b.zero_grad()
+            b.grad += (-a.data / (b.data**2)) * out.grad
+
+    out._backward = _backward
+    return out
+
 def pow(a: Tensor, exp: float) -> Tensor:
     """
     Elementwise power of Tensor: out = a**exp or a.pow(exp).
@@ -268,12 +329,12 @@ def pow(a: Tensor, exp: float) -> Tensor:
         >>> b = Tensor([4.0, 3.0], requires_grad=True)
         >>> out = div(a, b)
         >>> out.data.data
-        [8.0, 15.0]
+        [0.5, 2.0]
         >>> out.backward()
         >>> a.grad.data   # d(out)/da = 1/b
-        [4.0, 5.0]
+        [0.25, 0.3333]
         >>> b.grad.data   # d(out)/db = -a/b**2
-        [0.5, 2.0]
+        [-0.125, -0.2222]
     """
     out_data = a.data**exp
     out = Tensor(

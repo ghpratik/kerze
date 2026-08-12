@@ -373,7 +373,7 @@ class Array:
     # OPERATIONS
     def __add__(self, other: "Array") -> "Array":
         """Elementwise addition: self + other. Shapes must match exactly."""
-        other = other if isinstance(other, Array) else Array(other, self.shape)
+        other = other if isinstance(other, Array) else Array.full(other, self.shape)
         if self.shape != other.shape:
             raise ValueError(f"Shape mismatch: {self.shape} vs {other.shape}")
         return Array([x + y for x, y in zip(self.data, other.data)], shape=self.shape)
@@ -386,17 +386,18 @@ class Array:
 
     def __mul__(self, other: "Array") -> "Array":
         """Elementwise multiplication: self * other. Shapes must match exactly."""
-        if isinstance(other, Array):
-            if self.shape != other.shape:
-                raise ValueError(f"Shape mismatch: {self.shape} vs {other.shape}")
-            return Array(
-                [x * y for x, y in zip(self.data, other.data)],
-                shape=self.shape,
-            )
-        elif isinstance(other, (int, float)):
-            return Array([x * other for x in self.data], shape=self.shape)
-        else:
-            return NotImplemented
+        other = other if isinstance(other, Array) else Array.full(other, self.shape)
+        if self.shape != other.shape:
+            raise ValueError(f"Shape mismatch: {self.shape} vs {other.shape}")
+        return Array(
+            [x * y for x, y in zip(self.data, other.data)],
+            shape=self.shape,
+        )
+
+    def __rmul__(self, other: "Array") -> "Array":
+        """Supports `scalar * array` (Python tries __rmul__ when the left
+        operand's __mul__ doesn't know how to handle an Array)."""
+        return self.__mul__(other)
 
     def __neg__(self) -> "Array":
         """Elementwise negation: -self."""
@@ -404,6 +405,7 @@ class Array:
 
     def __sub__(self, other: "Array") -> "Array":
         """Elementwise subtraction: self - other. Shapes must match exactly."""
+        other = other if isinstance(other, Array) else Array.full(other, self.shape)
         if self.shape != other.shape:
             raise ValueError(f"Shape mismatch: {self.shape} vs {other.shape}")
         return Array(
@@ -411,12 +413,35 @@ class Array:
             shape=self.shape,
         )
 
+    def __rsub__(self, other: "Array") -> "Array":
+        """Supports `scalar - array` (Python tries __rsub__ when the left
+        operand's __sub__ doesn't know how to handle an Array)."""
+        other = other if isinstance(other, Array) else Array.full(other, self.shape)
+        if self.shape != other.shape:
+            raise ValueError(f"Shape mismatch: {self.shape} vs {other.shape}")
+        return Array(
+            [y - x for x, y in zip(self.data, other.data)],
+            shape=self.shape,
+        )
+
     def __truediv__(self, other: "Array") -> "Array":
-        """Elementwise addition: self/other. Shapes must match exactly"""
+        """Elementwise division: self/other. Shapes must match exactly"""
+        other = other if isinstance(other, Array) else Array.full(other, self.shape)
         if self.shape != other.shape:
             raise ValueError(f"Shape mismatch: {self.shape} vs {other.shape}")
         return Array(
             [x/y for x, y in zip(self.data, other.data)],
+            shape=self.shape
+        )
+
+    def __rtruediv__(self, other: "Array") -> "Array":
+        """Supports `scalar / array` (Python tries __rtruediv__ when the left
+        operand's __truediv__ doesn't know how to handle an Array)."""
+        other = other if isinstance(other, Array) else Array.full(other, self.shape)
+        if self.shape != other.shape:
+            raise ValueError(f"Shape mismatch: {self.shape} vs {other.shape}")
+        return Array(
+            [y/x for x, y in zip(self.data, other.data)],
             shape=self.shape
         )
 

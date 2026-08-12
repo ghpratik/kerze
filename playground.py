@@ -17,13 +17,13 @@ x = Array([[1.0, 2.0], [5.0, 2.0]])
 y = Array([[3.0, 4.0], [1.0, 1.0]])
 a = Tensor(x, requires_grad=True)
 b = Tensor(y, requires_grad=True)
-out = a**2
+out = a**2 + b**2
 # out = -c
 print(out)
 out.backward()
 print("Gradient of a: ", a.grad, a.grad.shape, a.grad.strides)  # [0.3333, 0.25][1., 1.,]
-# print("Gradient of b: ", b.grad)  # [-1/9.0, -2/16], [-5., -2.] 
+print("Gradient of b: ", b.grad)  # [-1/9.0, -2/16], [-5., -2.] 
 # print("Gradient of c: ", c.grad)  # [-1., -1]
 print("Gradient of Out: ", out.grad) # [1., 1.]
 
-print(a/b)
+print(out.data)
