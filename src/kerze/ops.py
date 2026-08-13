@@ -16,8 +16,7 @@ replace these once the `unbroadcast` helper is implemented.
 
 from __future__ import annotations
 
-from .ndarray import Array
-from .tensor import Tensor
+from .tensor.tensor import Tensor
 
 
 def add(a: Tensor, b: Tensor) -> Tensor:

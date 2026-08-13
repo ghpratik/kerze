@@ -12,6 +12,7 @@ copies, without depending on numpy.
 from __future__ import annotations
 from functools import reduce
 from operator import mul
+import math
 from typing import List, Tuple, Union
 
 
@@ -370,7 +371,10 @@ class Array:
             abs(a - b) < tol for a, b in zip(self.data, other.data)
         )
 
-    # OPERATIONS
+    # -----------------------------------------------OPERATIONS---------------------------------------------------------------
+    
+    # Arithmetic Operators
+
     def __add__(self, other: "Array") -> "Array":
         """Elementwise addition: self + other. Shapes must match exactly."""
         other = other if isinstance(other, Array) else Array.full(other, self.shape)
@@ -455,6 +459,178 @@ class Array:
         array-to-array exponentiation.
         """
         return Array([x ** exp for x in self.data], shape=self.shape)
+
+    # Math Functions
+
+    def exp(self) -> "Array":
+        """Elementwise e^x."""
+        return Array([math.exp(x) for x in self.data], shape=self.shape)
+
+    def log(self) -> "Array":
+        """
+        Elementwise natural log. Raises ValueError (via math.log) if any
+        element is <= 0 — this is deliberate, not caught/suppressed, since
+        silently producing NaN would hide a real bug (e.g. log of a
+        negative loss value).
+        """
+        return Array([math.log(x) for x in self.data], shape=self.shape)
+
+    def sqrt(self) -> "Array":
+        """Elementwise square root. Raises ValueError for negative elements."""
+        return Array([math.sqrt(x) for x in self.data], shape=self.shape)
+
+    # Reduction Operations
+
+    def sum(self) -> "Array":
+        """Sum all elements, returning a shape-(1,) Array."""
+        return Array([sum(self.data)], shape=(1,))
+
+    def mean(self) -> "Array":
+        """Mean of all elements, returning a shape-(1,) Array."""
+        return Array([sum(self.data) / self.size], shape=(1,))
+
+    ####### Matrix Multiplication ##################3
+    def _matmul_2d(self, other: "Array") -> "Array":
+        """
+        Core 2D matrix multiplication: self @ other.
+ 
+        Requires self.shape = (m, k) and other.shape = (k, n), producing
+        a result of shape (m, n). This is the triple-nested-loop
+        implementation (O(m*k*n)) that both plain 2D matmul and each
+        batch slice of 3D matmul delegate to.
+        """
+        m, k = self.shape
+        k2, n = other.shape
+        if k != k2:
+            raise ValueError(
+                f"Incompatible shapes for matmul: {self.shape} @ {other.shape}"
+            )
+ 
+        result = [0.0] * (m * n)
+        for i in range(m):
+            for j in range(n):
+                s = 0.0
+                for p in range(k):
+                    s += self.get(i, p) * other.get(p, j)
+                result[i * n + j] = s
+        return Array(result, shape=(m, n))
+ 
+    def _batch_slice(self, b: int) -> "Array":
+        """
+        Extract the b-th 2D slice from a 3D array of shape (batch, m, n).
+ 
+        Because storage is row-major and `batch` is the outermost
+        dimension, each batch's (m, n) sub-matrix is a contiguous chunk
+        of the flat buffer — no strided/scattered indexing needed, just
+        a plain slice.
+ 
+        Args:
+            b: The batch index to extract, 0 <= b < self.shape[0].
+ 
+        Returns:
+            A new (m, n) Array holding a copy of batch b's data.
+        """
+        _, m, n = self.shape
+        chunk_size = m * n
+        start = b * chunk_size
+        end = start + chunk_size
+        return Array(self.data[start:end], shape=(m, n))
+ 
+    @staticmethod
+    def stack(arrays: List["Array"]) -> "Array":
+        """
+        Stack a list of equal-shaped 2D Arrays into a single 3D Array.
+ 
+        The resulting shape is (len(arrays), m, n), where (m, n) is the
+        shape shared by every array in `arrays`. Because row-major layout
+        places the batch dimension outermost, this is simply the
+        concatenation of each array's flat data, in order.
+ 
+        Args:
+            arrays: A non-empty list of Arrays, all sharing the same 2D
+                shape.
+ 
+        Returns:
+            A new 3D Array of shape (len(arrays), m, n).
+ 
+        Raises:
+            ValueError: If `arrays` is empty, or the arrays don't all
+                share the same shape.
+        """
+        if not arrays:
+            raise ValueError("stack: cannot stack an empty list of arrays")
+        shape0 = arrays[0].shape
+        for a in arrays:
+            if a.shape != shape0:
+                raise ValueError(
+                    f"stack: all arrays must have the same shape, "
+                    f"got {shape0} and {a.shape}"
+                )
+        flat = []
+        for a in arrays:
+            flat.extend(a.data)
+        return Array(flat, shape=(len(arrays), *shape0))
+ 
+    def matmul(self, other: "Array") -> "Array":
+        """
+        Matrix multiplication: self @ other.
+ 
+        Dispatches based on dimensionality:
+            - Both 2D (m,k) @ (k,n) -> (m,n): standard matrix multiply.
+            - Both 3D (batch,m,k) @ (batch,k,n) -> (batch,m,n): batched
+              matrix multiply, applying 2D matmul independently to each
+              batch slice. Batch sizes must match.
+ 
+        Args:
+            other: The Array to multiply with. Must be 2D if self is 2D,
+                or 3D with a matching batch size if self is 3D.
+ 
+        Returns:
+            The matrix product, as described above.
+ 
+        Raises:
+            ValueError: If shapes are incompatible for multiplication, or
+                if the dimensionality combination isn't supported (e.g.
+                one 2D and one 3D operand).
+ 
+        Example:
+            >>> a = Array([[1, 2], [3, 4]])       # shape (2, 2)
+            >>> b = Array([[5, 6], [7, 8]])       # shape (2, 2)
+            >>> a.matmul(b).unflatten()
+            [[19, 22], [43, 50]]
+ 
+            >>> batch_a = Array.stack([a, a])     # shape (2, 2, 2)
+            >>> batch_b = Array.stack([b, b])     # shape (2, 2, 2)
+            >>> batch_a.matmul(batch_b).shape
+            (2, 2, 2)
+        """
+        if self.ndim == 2 and other.ndim == 2:
+            return self._matmul_2d(other)
+ 
+        elif self.ndim == 3 and other.ndim == 3:
+            batch = self.shape[0]
+            other_batch = other.shape[0]
+            if batch != other_batch:
+                raise ValueError(
+                    f"matmul: batch size mismatch {batch} vs {other_batch}"
+                )
+            results = [
+                self._batch_slice(b)._matmul_2d(other._batch_slice(b))
+                for b in range(batch)
+            ]
+            return Array.stack(results)
+ 
+        else:
+            raise ValueError(
+                f"matmul: unsupported ndim combination "
+                f"self.ndim={self.ndim}, other.ndim={other.ndim} "
+                f"(only 2D@2D and matching-batch 3D@3D are supported)"
+            )
+ 
+    def __matmul__(self, other: "Array") -> "Array":
+        """Operator overload for `self @ other`. Delegates to `matmul`."""
+        return self.matmul(other)
+
         
     def __repr__(self) -> str:
         """
