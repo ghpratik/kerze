@@ -1,6 +1,6 @@
 from kerze.ndarray import Array
 
-from kerze.tensor.tensor import Tensor
+from kerze.tensor import Tensor
 
 from kerze.ops import add, mul, neg, sub
 

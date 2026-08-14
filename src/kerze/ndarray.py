@@ -460,6 +460,7 @@ class Array:
         """
         return Array([x ** exp for x in self.data], shape=self.shape)
 
+
     # Math Functions
 
     def exp(self) -> "Array":
@@ -478,6 +479,7 @@ class Array:
     def sqrt(self) -> "Array":
         """Elementwise square root. Raises ValueError for negative elements."""
         return Array([math.sqrt(x) for x in self.data], shape=self.shape)
+
 
     # Reduction Operations
 

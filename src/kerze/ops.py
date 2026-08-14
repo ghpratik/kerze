@@ -16,8 +16,12 @@ replace these once the `unbroadcast` helper is implemented.
 
 from __future__ import annotations
 
-from .tensor.tensor import Tensor
+from .tensor import Tensor
 
+import math
+
+
+#----------------------------------------------ARITHMETIC--------------------------------------------------
 
 def add(a: Tensor, b: Tensor) -> Tensor:
     """
@@ -82,7 +86,6 @@ def add(a: Tensor, b: Tensor) -> Tensor:
 
     out._backward = _backward
     return out
-
 
 def mul(a: Tensor, b: Tensor) -> Tensor:
     """
@@ -350,6 +353,60 @@ def pow(a: Tensor, exp: float) -> Tensor:
             if a.grad is None:
                 a.zero_grad()
             a.grad += exp * (out.data/a.data) * out.grad
+
+    out._backward = _backward
+    return out
+
+
+#---------------------------------------------MATH FUNCTIONS----------------------------------------------
+
+def exp(a: Tensor) -> Tensor:
+    """
+    Elementwise exponential of Tensor: out = exp(a) or e**a.
+
+    Forward:
+        out[i] = math.e**a[i] for every element i
+
+    Backward (product rule, applied elementwise):
+        d(out)/d(a) = e**a, so gradient flowing to `a` is (incoming_grad * e**self).
+
+    Args:
+        a: First operand.
+
+    Returns:
+        A new Tensor holding `a.data.pow(exp)` (elementwise), with
+        `requires_grad=True` if either input requires grad, and a
+        `_backward` closure wired to accumulate gradient into both
+        `a` and `b` using the product rule.
+
+    Raises:
+        ValueError: If `a.shape != b.shape`.
+
+    Example:
+        >>> a = Tensor([2.0, 6.0], requires_grad=True)
+        >>> b = Tensor([4.0, 3.0], requires_grad=True)
+        >>> out = div(a, b)
+        >>> out.data.data
+        [0.5, 2.0]
+        >>> out.backward()
+        >>> a.grad.data   # d(out)/da = 1/b
+        [0.25, 0.3333]
+        >>> b.grad.data   # d(out)/db = -a/b**2
+        [-0.125, -0.2222]
+    """
+    out_data = math.exp**a
+    out = Tensor(
+        out_data,
+        requires_grad=(a.requires_grad),
+        _children=(a,),
+        _op="exp",
+    )
+
+    def _backward() -> None:
+        if a.requires_grad:
+            if a.grad is None:
+                a.zero_grad()
+            a.grad += out.data * out.grad
 
     out._backward = _backward
     return out

@@ -18,7 +18,7 @@ that has `requires_grad=True`.
 from __future__ import annotations
 from typing import Callable, List, Optional, Set, Tuple, Union
 
-from ..ndarray import Array, NestedList
+from .ndarray import Array, NestedList
 
 
 class Tensor:
@@ -172,7 +172,7 @@ class Tensor:
             >>> (a + b).data.data
             [4.0, 6.0]
         """
-        from ..ops import add
+        from .ops import add
         return add(self, other)
  
     def __mul__(self, other: "Tensor") -> "Tensor":
@@ -192,7 +192,7 @@ class Tensor:
             >>> (a * b).data.data
             [8.0, 15.0]
         """
-        from ..ops import mul
+        from .ops import mul
         return mul(self, other)
 
     def __neg__(self) -> Tensor:
@@ -209,7 +209,7 @@ class Tensor:
                 >>> (-a).data.data
                 [-2.0, -3.0]
         """
-        from ..ops import neg
+        from .ops import neg
         return neg(self)
 
     def __sub__(self, other: "Tensor") -> "Tensor":
@@ -229,7 +229,7 @@ class Tensor:
             >>> (a - b).data.data
             [-2.0, -2.0]
         """
-        from ..ops import sub
+        from .ops import sub
         return sub(self, other)
 
     def __truediv__(self, other):
@@ -249,7 +249,7 @@ class Tensor:
             >>> (a / b).data.data
             [0.5, 2.0]
         """
-        from ..ops import div
+        from .ops import div
         return div(self, other)
 
     def __pow__(self, exponent: float):
@@ -269,7 +269,7 @@ class Tensor:
             >>> (a / b).data.data
             [0.5, 2.0]
         """
-        from ..ops import pow
+        from .ops import pow
         return pow(self, exponent)
 
     def __repr__(self) -> str:
