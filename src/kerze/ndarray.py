@@ -298,6 +298,50 @@ class Array:
             result_data.append(self.get(*src_idx_full[pad:]))
         return Array(result_data, shape=target_shape)
 
+    def unbroadcast(self, target_shape: Tuple[int, ...]) -> "Array":
+        """
+        Collapse this array back down to `target_shape`, assuming it was
+        produced by broadcasting an array of `target_shape` up to
+        `self.shape`.
+
+        This is the backward-pass counterpart to `broadcast_to`: forward
+        broadcasting replicates a smaller array's values to fill a bigger
+        shape; the gradient flowing back through that operation must be
+        **summed** back down along exactly the dimensions that were
+        replicated, so each original element's gradient reflects the sum
+        of contributions from every position it was copied into.
+
+        Two kinds of collapsing happen, matching the two ways
+        `broadcast_to` can expand:
+            1. Extra leading dimensions (added via left-padding) are
+               summed away entirely (axis=0, repeatedly).
+            2. Dimensions that were size 1 in `target_shape` but got
+               stretched to a larger size are summed back to size 1
+               (keeping the dimension in place, via keepdims=True).
+
+        Args:
+            target_shape: The shape to collapse back down to — normally
+                the original (pre-broadcast) shape of one operand in a
+                broadcasting binary op.
+
+        Returns:
+            A new Array of shape `target_shape`.
+
+        Example:
+            >>> grad = Array([[1, 2, 3], [4, 5, 6]])   # shape (2, 3)
+            >>> grad.unbroadcast((3,)).data              # summed over axis 0
+            [5.0, 7.0, 9.0]
+            >>> grad.unbroadcast((2, 1)).data             # summed over axis 1
+            [6.0, 15.0]
+        """
+        result = self
+        while result.ndim > len(target_shape):
+            result = result.sum(axis=0)
+        for axis in range(len(target_shape)):
+            if target_shape[axis] == 1 and result.shape[axis] != 1:
+                result = result.sum(axis=axis, keepdims=True)
+        return result.reshape(target_shape)
+
     def _broadcast_binop(self, other, op) -> "Array":
         """
         Shared implementation for broadcasting-aware elementwise binary

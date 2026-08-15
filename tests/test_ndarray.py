@@ -349,6 +349,124 @@ class TestBroadcastTo:
 
 
 # ---------------------------------------------------------------------------
+# unbroadcast
+# ---------------------------------------------------------------------------
+
+class TestUnbroadcast:
+    def test_unbroadcast_vector_from_matrix(self):
+        # (3,) was broadcast to (2,3)
+        grad = Array([[1, 2, 3], [4, 5, 6]])
+
+        result = grad.unbroadcast((3,))
+
+        assert result.shape == (3,)
+        assert result.data == [5, 7, 9]
+
+    def test_unbroadcast_row_vector(self):
+        # (1,3) was broadcast to (2,3)
+        grad = Array([[1, 2, 3], [4, 5, 6]])
+
+        result = grad.unbroadcast((1, 3))
+
+        assert result.shape == (1, 3)
+        assert result.data == [5, 7, 9]
+
+    def test_unbroadcast_column_vector(self):
+        # (2,1) was broadcast to (2,3)
+        grad = Array([[1, 2, 3], [4, 5, 6]])
+
+        result = grad.unbroadcast((2, 1))
+
+        assert result.shape == (2, 1)
+        assert result.data == [6, 15]
+
+    def test_unbroadcast_scalar_like_array(self):
+        # (1,1) was broadcast to (2,3)
+        grad = Array([[1, 2, 3], [4, 5, 6]])
+
+        result = grad.unbroadcast((1, 1))
+
+        assert result.shape == (1, 1)
+        assert result.data == [21]
+
+    def test_unbroadcast_extra_leading_dimensions_3d(self):
+        # (3,) was broadcast to (2, 4, 3)
+        grad = Array(
+            [
+                [[1, 2, 3], [4, 5, 6]],
+                [[7, 8, 9], [10, 11, 12]],
+            ]
+        )
+
+        result = grad.unbroadcast((3,))
+
+        assert result.shape == (3,)
+        assert result.data == [22, 26, 30]
+
+    def test_unbroadcast_3d_to_2d(self):
+        # (2,3) was broadcast to (4,2,3)
+        grad = Array(
+            [
+                [[1, 2, 3], [4, 5, 6]],
+                [[7, 8, 9], [10, 11, 12]],
+                [[13, 14, 15], [16, 17, 18]],
+                [[19, 20, 21], [22, 23, 24]],
+            ]
+        )
+
+        result = grad.unbroadcast((2, 3))
+
+        assert result.shape == (2, 3)
+        assert result.data == [40, 44, 48, 52, 56, 60]
+
+    def test_unbroadcast_multiple_broadcast_dimensions(self):
+        # (1,3,1) was broadcast to (2,3,4)
+        grad = Array(
+            [
+                [
+                    [1, 2, 3, 4],
+                    [5, 6, 7, 8],
+                    [9, 10, 11, 12],
+                ],
+                [
+                    [13, 14, 15, 16],
+                    [17, 18, 19, 20],
+                    [21, 22, 23, 24],
+                ],
+            ]
+        )
+
+        result = grad.unbroadcast((1, 3, 1))
+
+        assert result.shape == (1, 3, 1)
+        assert result.data == [68, 100, 132]
+
+    def test_unbroadcast_same_shape_returns_same_values(self):
+        grad = Array([[1, 2], [3, 4]])
+
+        result = grad.unbroadcast((2, 2))
+
+        assert result.shape == (2, 2)
+        assert result.data == [1, 2, 3, 4]
+
+    def test_unbroadcast_result_can_be_broadcast_back(self):
+        # This verifies the important relationship:
+        #
+        # broadcast -> gradient -> unbroadcast
+        #
+        # The resulting shape should be the original operand shape.
+        grad = Array([[1, 2, 3], [4, 5, 6]])
+
+        result = grad.unbroadcast((3,))
+
+        assert result.broadcast_to((2, 3)).shape == (2, 3)
+        assert result.broadcast_to((2, 3)).data == [
+            5, 7, 9,
+            5, 7, 9,
+        ]
+
+
+# ---------------------------------------------------------------------------
 # Arithmetic operators — equal shapes, scalars, and broadcasting
 # ---------------------------------------------------------------------------
 
