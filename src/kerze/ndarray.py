@@ -13,6 +13,7 @@ from __future__ import annotations
 from functools import reduce
 from operator import mul
 import math
+import itertools
 from typing import List, Tuple, Union
 
 
@@ -56,31 +57,16 @@ class Array:
                 the data is flattened automatically. Can also be a flat
                 list, in which case `shape` must be provided.
             shape: The intended shape of the array. If omitted, it is
-                inferred from the nesting depth/lengths of `data`. If
-                provided alongside nested data, the nested data is still
-                flattened and then validated against this shape. If
-                provided alongside flat data, the flat data's length is
-                validated against this shape.
+                inferred from the nesting depth/lengths of `data`.
 
         Raises:
             ValueError: If `shape` is provided and the number of elements
-                in `data` does not match `numel(shape)` (i.e. the product
-                of all dimensions in `shape`).
-
-        Example:
-            >>> Array([[1, 2, 3], [4, 5, 6]])
-            Array(shape=(2, 3))
-            >>> Array([[1, 2, 3], [4, 5, 6], [3,4,2]], shape=(3, 3))
-            Array(shape=(3, 3))
+                in `data` does not match `numel(shape)`.
         """
         if shape is None:
-            # No shape given: infer it from the nested list structure,
-            # then flatten the nested list into self.data.
             shape = self._infer_shape(data)
             data = self._flatten(data)
         else:
-            # Shape given explicitly: flatten if needed, then verify the
-            # flat length actually matches what `shape` implies.
             if self._is_nested(data):
                 data = self._flatten(data)
             else:
@@ -99,56 +85,18 @@ class Array:
         self.strides: Tuple[int, ...] = self._compute_strides(self.shape)
 
     @staticmethod
-    def _numel(shape: Tuple[int, ...]) -> int: # Number of Elements
-        """
-        Compute the total number of elements a given shape represents.
-
-        This is the product of all dimension sizes. E.g. shape (2, 3, 4)
-        holds 2 * 3 * 4 = 24 elements.
-
-        Args:
-            shape: A tuple of dimension sizes.
-
-        Returns:
-            The total element count implied by `shape`.
-        """
+    def _numel(shape: Tuple[int, ...]) -> int:
+        """Compute the total number of elements a given shape represents."""
         return reduce(mul, shape, 1)
 
     @staticmethod
     def _is_nested(data: NestedList) -> bool:
-        """
-        Check whether `data` is a nested list (list of lists) rather than
-        a flat list of numbers.
-
-        Args:
-            data: The candidate data, either flat (e.g. [1, 2, 3]) or
-                nested (e.g. [[1, 2], [3, 4]]).
-
-        Returns:
-            True if `data` is a non-empty list whose first element is
-            itself a list (i.e. it has at least one more level of nesting).
-        """
+        """Check whether `data` is a nested list rather than a flat list."""
         return isinstance(data, list) and len(data) > 0 and isinstance(data[0], list)
 
     @staticmethod
     def _infer_shape(nested: NestedList) -> Tuple[int, ...]:
-        """
-        Determine the shape of a nested list by walking its structure.
-
-        Repeatedly measures the length of each nesting level and descends
-        into the first element until a non-list (scalar) is reached.
-
-        Args:
-            nested: A nested Python list, e.g. [[1, 2, 3], [4, 5, 6]].
-
-        Returns:
-            A tuple of dimension sizes, e.g. (2, 3) for the example above.
-
-        Note:
-            Assumes the nested list is "rectangular" (every sub-list at a
-            given depth has the same length). No validation is performed
-            for ragged/jagged input.
-        """
+        """Determine the shape of a nested list by walking its structure."""
         shape = []
         while isinstance(nested, list):
             shape.append(len(nested))
@@ -157,21 +105,7 @@ class Array:
 
     @classmethod
     def _flatten(cls, nested: NestedList) -> List[float]:
-        """
-        Recursively flatten a nested list into a single flat list, in
-        row-major (C-style) order.
-
-        Args:
-            nested: A nested Python list, or a single scalar value.
-
-        Returns:
-            A flat list of all scalar values, in the order they appear
-            when reading the nested structure left-to-right, outer-to-inner.
-
-        Example:
-            >>> Array._flatten([[1, 2], [3, 4]])
-            [1, 2, 3, 4]
-        """
+        """Recursively flatten a nested list into a single flat list."""
         if not isinstance(nested, list):
             return [nested]
         result: List[float] = []
@@ -180,158 +114,58 @@ class Array:
         return result
 
     @classmethod
-    def _unflatten(
-        cls, flat: List[float], shape: Tuple[int, ...]
-    ) -> NestedList:
-        """
-        Recursively rebuild a nested list from a flat list and a shape.
- 
-        At each recursion level, splits `flat` into `shape[0]` equal-sized
-        chunks (each chunk having size = product of the remaining
-        dimensions), then recurses into each chunk using the remaining
-        shape. The base case (empty shape) returns the single remaining
-        scalar.
- 
-        Declared as a classmethod (rather than staticmethod) because it
-        recurses on itself via `cls`, matching the pattern used by
-        `_flatten`. This ensures the recursion resolves correctly against
-        `type(self)` if `Array` is ever subclassed.
- 
-        Args:
-            flat: The flat list of values to regroup. Must have exactly
-                `numel(shape)` elements.
-            shape: The target shape to rebuild, e.g. (2, 3).
- 
-        Returns:
-            A nested list matching `shape`, or a single scalar if `shape`
-            is empty (representing a 0-D array).
- 
-        Example:
-            >>> Array._unflatten([1, 2, 3, 4, 5, 6], (2, 3))
-            [[1, 2, 3], [4, 5, 6]]
-        """
+    def _unflatten(cls, flat: List[float], shape: Tuple[int, ...]) -> NestedList:
+        """Recursively rebuild a nested list from a flat list and a shape."""
         if len(shape) == 0:
-            # Base case: no dimensions left, this is a single scalar.
             return flat[0]
- 
         if len(shape) == 1:
-            # Innermost dimension: just return the chunk as-is.
             return list(flat)
- 
-        # Size of each sub-chunk = product of all dimensions after the first.
         chunk_size = cls._numel(shape[1:])
         outer_size = shape[0]
- 
         return [
-            cls._unflatten(
-                flat[i * chunk_size : (i + 1) * chunk_size],
-                shape[1:],
-            )
+            cls._unflatten(flat[i * chunk_size : (i + 1) * chunk_size], shape[1:])
             for i in range(outer_size)
         ]
 
     @staticmethod
     def _compute_strides(shape: Tuple[int, ...]) -> Tuple[int, ...]:
-        """
-        Compute row-major (C-style) strides for a given shape.
-
-        The stride for a given axis is the number of flat-buffer positions
-        you must skip to move one step along that axis. For row-major
-        layout, the stride of the last axis is always 1, and each
-        preceding axis's stride is the product of all following
-        dimension sizes.
-
-        Args:
-            shape: The shape to compute strides for, e.g. (2, 3, 4).
-
-        Returns:
-            A tuple of strides, one per axis, e.g. (12, 4, 1) for shape
-            (2, 3, 4).
-
-        Example:
-            >>> Array._compute_strides((2, 3))
-            (3, 1)
-        """
+        """Compute row-major (C-style) strides for a given shape."""
         strides = [1] * len(shape)
         for i in range(len(shape) - 2, -1, -1):
             strides[i] = strides[i + 1] * shape[i + 1]
         return tuple(strides)
 
     def get(self, *indices: int) -> float:
-        """
-        Retrieve the value at the given logical (row, col, ...) coordinates.
-
-        Translates the multi-dimensional index into a single flat-buffer
-        position using `self.strides`, then looks up that position in
-        `self.data`.
-
-        Args:
-            *indices: One integer per dimension, e.g. `get(1, 2)` for a
-                2D array's row 1, column 2. Must supply exactly
-                `len(self.shape)` indices.
-
-        Returns:
-            The scalar value stored at the given coordinates.
-
-        Example:
-            >>> arr = Array([[1, 2, 3], [4, 5, 6]])
-            >>> arr.get(1, 2)
-            6
-        """
+        """Retrieve the value at the given logical coordinates."""
         flat_index = sum(i * s for i, s in zip(indices, self.strides))
         return self.data[flat_index]
 
     def set(self, value: float, *indices: int) -> None:
-        """
-        Write a value at the given logical (row, col, ...) coordinates.
-
-        Translates the multi-dimensional index into a single flat-buffer
-        position using `self.strides`, then writes `value` at that
-        position in `self.data`.
-
-        Args:
-            value: The scalar value to store.
-            *indices: One integer per dimension, e.g. `set(9, 1, 2)` sets
-                row 1, column 2 to 9 for a 2D array.
-
-        Example:
-            >>> arr = Array([[1, 2, 3], [4, 5, 6]])
-            >>> arr.set(9, 1, 2)
-            >>> arr.get(1, 2)
-            9
-        """
+        """Write a value at the given logical coordinates."""
         flat_index = sum(i * s for i, s in zip(indices, self.strides))
         self.data[flat_index] = value
 
     @property
     def ndim(self) -> int:
-        """
-        The number of dimensions (axes) of this array.
-
-        Equivalent to `len(self.shape)`. E.g. a matrix has ndim=2, a
-        vector has ndim=1, a scalar wrapped as an Array has ndim=0.
-        """
+        """The number of dimensions (axes) of this array."""
         return len(self.shape)
 
     @property
     def size(self) -> int:
-        """
-        The total number of elements in this array.
-
-        Equivalent to the product of all values in `self.shape`, and
-        always equal to `len(self.data)`.
-        """
+        """The total number of elements in this array."""
         return self._numel(self.shape)
 
     def reshape(self, new_shape):
+        """Reshape to a new shape with the same total element count."""
         if self._numel(new_shape) != self.size:
             raise ValueError(f"Cannot reshape {self.shape} into {new_shape}")
         return Array(self.data, shape=new_shape)
 
     def transpose(self):
+        """Zero-copy transpose: reverses shape and strides, shares data buffer."""
         new_shape = tuple(reversed(self.shape))
         new_strides = tuple(reversed(self.strides))
-        result = Array.__new__(Array)   # bypass __init__'s flatten logic
+        result = Array.__new__(Array)
         result.data = self.data
         result.shape = new_shape
         result.strides = new_strides
@@ -339,74 +173,179 @@ class Array:
 
     @classmethod
     def zeros(cls, shape):
-        """
-        Create an Array of the given shape, with every element set to 0.0.
-        """
+        """Create an Array of the given shape, with every element set to 0.0."""
         return cls([0.0] * cls._numel(shape), shape=shape)
 
     @classmethod
     def ones(cls, shape):
-        """
-        Create an Array of the given shape, with every element set to 1.0.
-        """
+        """Create an Array of the given shape, with every element set to 1.0."""
         return cls([1.0] * cls._numel(shape), shape=shape)
 
     @classmethod
     def full(cls, value: float, shape: Tuple[int, ...]) -> "Array":
-        """
-        Create an Array of the given shape, with every element set to
-        the same scalar value.
- 
-        Args:
-            value: The scalar value every element should be set to.
-            shape: The desired shape of the resulting array, e.g. (2, 3).
- 
-        Returns:
-            A new Array of shape `shape`, with every element equal to
-            `value`.
- 
-        Example:
-            >>> Array.full(7, (2, 3))
-            Array(data=[[7, 7, 7], [7, 7, 7]], shape=(2, 3))
-        """
+        """Create an Array of the given shape, with every element set to `value`."""
         return cls([value] * cls._numel(shape), shape=shape)
 
-
     def allclose(self, other: "Array", tol=1e-6):
+        """Check elementwise approximate equality within a tolerance."""
         return self.shape == other.shape and all(
             abs(a - b) < tol for a, b in zip(self.data, other.data)
         )
 
-    # -----------------------------------------------OPERATIONS---------------------------------------------------------------
-    
-    # Arithmetic Operators
+    # -------------------------------------------------------------------
+    # Broadcasting
+    # -------------------------------------------------------------------
+
+    @staticmethod
+    def broadcast_shapes(
+        shape_a: Tuple[int, ...], shape_b: Tuple[int, ...]
+    ) -> Tuple[int, ...]:
+        """
+        Determine the resulting shape of broadcasting two shapes together,
+        following numpy-style broadcasting rules.
+
+        Shapes are aligned from the right (trailing dimensions first).
+        Missing leading dimensions are treated as size 1. Two dimensions
+        are compatible if they are equal, or if either of them is 1 (in
+        which case the size-1 dimension is "stretched" to match the
+        other). The output shape takes the larger size at each position.
+
+        Args:
+            shape_a: The first shape, e.g. (2, 3).
+            shape_b: The second shape, e.g. (3,).
+
+        Returns:
+            The broadcast-compatible output shape, e.g. (2, 3) for the
+            example above.
+
+        Raises:
+            ValueError: If the shapes are not broadcast-compatible at
+                any aligned dimension.
+
+        Example:
+            >>> Array.broadcast_shapes((2, 3), (3,))
+            (2, 3)
+            >>> Array.broadcast_shapes((2, 1), (2, 3))
+            (2, 3)
+        """
+        len_diff = len(shape_b) - len(shape_a)
+        if len_diff > 0:
+            shape_a = (1,) * len_diff + shape_a
+        elif len_diff < 0:
+            shape_b = (1,) * (-len_diff) + shape_b
+
+        result = []
+        for a, b in zip(shape_a, shape_b):
+            if a == b or a == 1 or b == 1:
+                result.append(max(a, b))
+            else:
+                raise ValueError(f"Shapes not broadcastable: {shape_a} vs {shape_b}")
+        return tuple(result)
+
+    def broadcast_to(self, target_shape: Tuple[int, ...]) -> "Array":
+        """
+        Expand this array to `target_shape` by replicating elements along
+        any dimension where this array has size 1 (or is missing the
+        dimension entirely, i.e. a leading dimension).
+
+        This does not check that `target_shape` was actually produced by
+        `broadcast_shapes` against some other array — it only checks that
+        `self.shape` can be validly stretched into `target_shape`. Use
+        `broadcast_shapes` first to compute the correct target shape when
+        combining two arrays.
+
+        Args:
+            target_shape: The shape to expand into. Must have the same
+                or more dimensions than `self.shape`, and every one of
+                `self.shape`'s dimensions must either match the
+                corresponding `target_shape` dimension or be 1.
+
+        Returns:
+            A new Array of shape `target_shape`. If `self.shape` already
+            equals `target_shape`, returns `self` unchanged (no copy).
+
+        Raises:
+            ValueError: If `self.shape` cannot be broadcast into
+                `target_shape`.
+
+        Example:
+            >>> v = Array([10, 20, 30], shape=(3,))
+            >>> Array._unflatten(v.broadcast_to((2, 3)).data, (2, 3))
+            [[10, 20, 30], [10, 20, 30]]
+        """
+        if self.shape == target_shape:
+            return self
+
+        pad = len(target_shape) - self.ndim
+        if pad < 0:
+            raise ValueError(f"Cannot broadcast {self.shape} to {target_shape}")
+
+        padded_shape = (1,) * pad + self.shape
+        for s, t in zip(padded_shape, target_shape):
+            if s != t and s != 1:
+                raise ValueError(f"Cannot broadcast {self.shape} to {target_shape}")
+
+        result_data = []
+        for idx in itertools.product(*[range(d) for d in target_shape]):
+            # For each target position, use index 0 along any dimension
+            # where the (padded) source has size 1 — that's the "stretch."
+            src_idx_full = [
+                0 if padded_shape[axis] == 1 else idx[axis]
+                for axis in range(len(target_shape))
+            ]
+            # Drop the leading padded dimensions before indexing into
+            # self, since self.get only expects self.ndim indices.
+            result_data.append(self.get(*src_idx_full[pad:]))
+        return Array(result_data, shape=target_shape)
+
+    def _broadcast_binop(self, other, op) -> "Array":
+        """
+        Shared implementation for broadcasting-aware elementwise binary
+        operators (add, sub, mul, truediv). Not part of the public API —
+        called internally by the dunder methods below, so the actual
+        broadcasting logic lives in exactly one place (DRY).
+
+        Converts a scalar `other` into a matching-shape Array, computes
+        the broadcast output shape for the two operands, expands both to
+        that shape, then applies `op` elementwise.
+
+        Args:
+            other: An Array or scalar (int/float) to combine with self.
+            op: A function taking two scalars and returning one, e.g.
+                `lambda x, y: x + y`.
+
+        Returns:
+            A new Array holding the elementwise result, with shape equal
+            to the broadcast of `self.shape` and `other`'s shape.
+        """
+        other_arr = other if isinstance(other, Array) else Array.full(other, self.shape)
+        out_shape = Array.broadcast_shapes(self.shape, other_arr.shape)
+        a = self.broadcast_to(out_shape)
+        b = other_arr.broadcast_to(out_shape)
+        return Array([op(x, y) for x, y in zip(a.data, b.data)], shape=out_shape)
+
+    # -------------------------------------------------------------------
+    # Arithmetic operators — now broadcasting-aware
+    # -------------------------------------------------------------------
 
     def __add__(self, other: "Array") -> "Array":
-        """Elementwise addition: self + other. Shapes must match exactly."""
-        other = other if isinstance(other, Array) else Array.full(other, self.shape)
-        if self.shape != other.shape:
-            raise ValueError(f"Shape mismatch: {self.shape} vs {other.shape}")
-        return Array([x + y for x, y in zip(self.data, other.data)], shape=self.shape)
+        """
+        Addition: self + other. Supports full broadcasting (not just
+        exact shape matches or plain scalars) — e.g. (2,3) + (3,) or
+        (2,1) + (2,3) both work now.
+        """
+        return self._broadcast_binop(other, lambda x, y: x + y)
 
     def __radd__(self, other: "Array") -> "Array":
-        """Supports `scalar + array` (Python tries __radd__ when the left
-        operand's __add__ doesn't know how to handle an Array)."""
+        """Supports `scalar + array`. Addition is commutative."""
         return self.__add__(other)
 
-
     def __mul__(self, other: "Array") -> "Array":
-        """Elementwise multiplication: self * other. Shapes must match exactly."""
-        other = other if isinstance(other, Array) else Array.full(other, self.shape)
-        if self.shape != other.shape:
-            raise ValueError(f"Shape mismatch: {self.shape} vs {other.shape}")
-        return Array(
-            [x * y for x, y in zip(self.data, other.data)],
-            shape=self.shape,
-        )
+        """Elementwise multiplication: self * other. Broadcasting-aware."""
+        return self._broadcast_binop(other, lambda x, y: x * y)
 
     def __rmul__(self, other: "Array") -> "Array":
-        """Supports `scalar * array` (Python tries __rmul__ when the left
-        operand's __mul__ doesn't know how to handle an Array)."""
+        """Supports `scalar * array`. Multiplication is commutative."""
         return self.__mul__(other)
 
     def __neg__(self) -> "Array":
@@ -414,106 +353,142 @@ class Array:
         return Array([-x for x in self.data], shape=self.shape)
 
     def __sub__(self, other: "Array") -> "Array":
-        """Elementwise subtraction: self - other. Shapes must match exactly."""
-        other = other if isinstance(other, Array) else Array.full(other, self.shape)
-        if self.shape != other.shape:
-            raise ValueError(f"Shape mismatch: {self.shape} vs {other.shape}")
-        return Array(
-            [x - y for x, y in zip(self.data, other.data)],
-            shape=self.shape,
-        )
+        """Elementwise subtraction: self - other. Broadcasting-aware."""
+        return self._broadcast_binop(other, lambda x, y: x - y)
 
     def __rsub__(self, other: "Array") -> "Array":
-        """Supports `scalar - array` (Python tries __rsub__ when the left
-        operand's __sub__ doesn't know how to handle an Array)."""
-        other = other if isinstance(other, Array) else Array.full(other, self.shape)
-        if self.shape != other.shape:
-            raise ValueError(f"Shape mismatch: {self.shape} vs {other.shape}")
-        return Array(
-            [y - x for x, y in zip(self.data, other.data)],
-            shape=self.shape,
-        )
+        """Supports `scalar - array`. Subtraction is NOT commutative, so
+        operand order is flipped inside the lambda (y - x, not x - y)."""
+        return self._broadcast_binop(other, lambda x, y: y - x)
 
     def __truediv__(self, other: "Array") -> "Array":
-        """Elementwise division: self/other. Shapes must match exactly"""
-        other = other if isinstance(other, Array) else Array.full(other, self.shape)
-        if self.shape != other.shape:
-            raise ValueError(f"Shape mismatch: {self.shape} vs {other.shape}")
-        return Array(
-            [x/y for x, y in zip(self.data, other.data)],
-            shape=self.shape
-        )
+        """Elementwise division: self / other. Broadcasting-aware."""
+        return self._broadcast_binop(other, lambda x, y: x / y)
 
     def __rtruediv__(self, other: "Array") -> "Array":
-        """Supports `scalar / array` (Python tries __rtruediv__ when the left
-        operand's __truediv__ doesn't know how to handle an Array)."""
-        other = other if isinstance(other, Array) else Array.full(other, self.shape)
-        if self.shape != other.shape:
-            raise ValueError(f"Shape mismatch: {self.shape} vs {other.shape}")
-        return Array(
-            [y/x for x, y in zip(self.data, other.data)],
-            shape=self.shape
-        )
+        """Supports `scalar / array`. Division is NOT commutative, so
+        operand order is flipped inside the lambda (y / x, not x / y)."""
+        return self._broadcast_binop(other, lambda x, y: y / x)
 
     def __pow__(self, exp: float) -> "Array":
         """
-        Elementwise power: self ** exp.
-
-        Applies the exponent independently to every element. `exp` is
-        a scalar (Python int/float), not another Array — this is
-        "raise each element to this power," not elementwise
-        array-to-array exponentiation.
+        Elementwise power: self ** exp. `exp` is a scalar (int/float),
+        applied independently to every element.
         """
         return Array([x ** exp for x in self.data], shape=self.shape)
 
-
-    # Math Functions
+    # -------------------------------------------------------------------
+    # Elementwise math functions
+    # -------------------------------------------------------------------
 
     def exp(self) -> "Array":
         """Elementwise e^x."""
         return Array([math.exp(x) for x in self.data], shape=self.shape)
 
     def log(self) -> "Array":
-        """
-        Elementwise natural log. Raises ValueError (via math.log) if any
-        element is <= 0 — this is deliberate, not caught/suppressed, since
-        silently producing NaN would hide a real bug (e.g. log of a
-        negative loss value).
-        """
+        """Elementwise natural log. Raises ValueError for elements <= 0."""
         return Array([math.log(x) for x in self.data], shape=self.shape)
 
     def sqrt(self) -> "Array":
         """Elementwise square root. Raises ValueError for negative elements."""
         return Array([math.sqrt(x) for x in self.data], shape=self.shape)
 
+    # -------------------------------------------------------------------
+    # Reduction operations — now axis-aware
+    # -------------------------------------------------------------------
 
-    # Reduction Operations
+    def sum(self, axis: int = None, keepdims: bool = False) -> "Array":
+        """
+        Sum elements along an axis, or over the whole array.
 
-    def sum(self) -> "Array":
-        """Sum all elements, returning a shape-(1,) Array."""
-        return Array([sum(self.data)], shape=(1,))
+        Args:
+            axis: Which dimension to sum over. If None (default), sums
+                every element in the array down to a single value
+                (shape (1,), or all-1s shape if keepdims=True). If an
+                int, sums only along that axis, keeping the others.
+                Negative axis values count from the end (-1 = last axis),
+                matching numpy convention.
+            keepdims: If True, the reduced axis is kept in the output
+                shape with size 1 (e.g. summing a (2,3) array along
+                axis=0 gives shape (1,3) instead of (3,)). Useful when
+                you want the result to still broadcast naturally against
+                the original array.
 
-    def mean(self) -> "Array":
-        """Mean of all elements, returning a shape-(1,) Array."""
-        return Array([sum(self.data) / self.size], shape=(1,))
+        Returns:
+            A new Array with the specified axis reduced (or fully
+            reduced if axis=None).
 
-    ####### Matrix Multiplication ##################3
+        Example:
+            >>> a = Array([[1, 2, 3], [4, 5, 6]])   # shape (2, 3)
+            >>> Array._unflatten(a.sum().data, a.sum().shape)
+            [21]
+            >>> s0 = a.sum(axis=0)
+            >>> Array._unflatten(s0.data, s0.shape)
+            [5, 7, 9]
+            >>> s1 = a.sum(axis=1)
+            >>> Array._unflatten(s1.data, s1.shape)
+            [6, 15]
+        """
+        if axis is None:
+            total = sum(self.data)
+            out_shape = tuple(1 for _ in self.shape) if keepdims else (1,)
+            return Array([total], shape=out_shape)
+
+        if axis < 0:
+            axis = self.ndim + axis
+
+        reduced_shape = list(self.shape)
+        reduced_shape[axis] = 1
+        reduced_shape = tuple(reduced_shape)
+
+        result = Array.zeros(reduced_shape)
+        for idx in itertools.product(*[range(d) for d in self.shape]):
+            out_idx = list(idx)
+            out_idx[axis] = 0
+            result.set(result.get(*out_idx) + self.get(*idx), *out_idx)
+
+        if not keepdims:
+            final_shape = tuple(d for i, d in enumerate(reduced_shape) if i != axis)
+            if final_shape == ():
+                final_shape = (1,)
+            result = result.reshape(final_shape)
+        return result
+
+    def mean(self, axis: int = None, keepdims: bool = False) -> "Array":
+        """
+        Mean of elements along an axis, or over the whole array.
+
+        Same `axis`/`keepdims` semantics as `sum` — this is implemented
+        as `sum(axis, keepdims) / n`, where `n` is the number of elements
+        that were averaged together (the full size if axis=None, or the
+        size of just that axis otherwise).
+
+        Example:
+            >>> a = Array([[1, 2, 3], [4, 5, 6]])
+            >>> m = a.mean(axis=1)
+            >>> Array._unflatten(m.data, m.shape)
+            [2.0, 5.0]
+        """
+        if axis is None:
+            n = self.size
+        else:
+            ax = axis if axis >= 0 else self.ndim + axis
+            n = self.shape[ax]
+        s = self.sum(axis=axis, keepdims=keepdims)
+        return s / n
+
+    # -------------------------------------------------------------------
+    # Matrix multiplication
+    # -------------------------------------------------------------------
+
     def _matmul_2d(self, other: "Array") -> "Array":
-        """
-        Core 2D matrix multiplication: self @ other.
- 
-        Requires self.shape = (m, k) and other.shape = (k, n), producing
-        a result of shape (m, n). This is the triple-nested-loop
-        implementation (O(m*k*n)) that both plain 2D matmul and each
-        batch slice of 3D matmul delegate to.
-        """
+        """Core 2D matrix multiplication: self @ other, shape (m,k)@(k,n)->(m,n)."""
         m, k = self.shape
         k2, n = other.shape
         if k != k2:
             raise ValueError(
                 f"Incompatible shapes for matmul: {self.shape} @ {other.shape}"
             )
- 
         result = [0.0] * (m * n)
         for i in range(m):
             for j in range(n):
@@ -522,49 +497,18 @@ class Array:
                     s += self.get(i, p) * other.get(p, j)
                 result[i * n + j] = s
         return Array(result, shape=(m, n))
- 
+
     def _batch_slice(self, b: int) -> "Array":
-        """
-        Extract the b-th 2D slice from a 3D array of shape (batch, m, n).
- 
-        Because storage is row-major and `batch` is the outermost
-        dimension, each batch's (m, n) sub-matrix is a contiguous chunk
-        of the flat buffer — no strided/scattered indexing needed, just
-        a plain slice.
- 
-        Args:
-            b: The batch index to extract, 0 <= b < self.shape[0].
- 
-        Returns:
-            A new (m, n) Array holding a copy of batch b's data.
-        """
+        """Extract the b-th 2D slice from a 3D array of shape (batch, m, n)."""
         _, m, n = self.shape
         chunk_size = m * n
         start = b * chunk_size
         end = start + chunk_size
         return Array(self.data[start:end], shape=(m, n))
- 
+
     @staticmethod
     def stack(arrays: List["Array"]) -> "Array":
-        """
-        Stack a list of equal-shaped 2D Arrays into a single 3D Array.
- 
-        The resulting shape is (len(arrays), m, n), where (m, n) is the
-        shape shared by every array in `arrays`. Because row-major layout
-        places the batch dimension outermost, this is simply the
-        concatenation of each array's flat data, in order.
- 
-        Args:
-            arrays: A non-empty list of Arrays, all sharing the same 2D
-                shape.
- 
-        Returns:
-            A new 3D Array of shape (len(arrays), m, n).
- 
-        Raises:
-            ValueError: If `arrays` is empty, or the arrays don't all
-                share the same shape.
-        """
+        """Stack a list of equal-shaped 2D Arrays into a single 3D Array."""
         if not arrays:
             raise ValueError("stack: cannot stack an empty list of arrays")
         shape0 = arrays[0].shape
@@ -578,43 +522,17 @@ class Array:
         for a in arrays:
             flat.extend(a.data)
         return Array(flat, shape=(len(arrays), *shape0))
- 
+
     def matmul(self, other: "Array") -> "Array":
         """
         Matrix multiplication: self @ other.
- 
-        Dispatches based on dimensionality:
-            - Both 2D (m,k) @ (k,n) -> (m,n): standard matrix multiply.
-            - Both 3D (batch,m,k) @ (batch,k,n) -> (batch,m,n): batched
-              matrix multiply, applying 2D matmul independently to each
-              batch slice. Batch sizes must match.
- 
-        Args:
-            other: The Array to multiply with. Must be 2D if self is 2D,
-                or 3D with a matching batch size if self is 3D.
- 
-        Returns:
-            The matrix product, as described above.
- 
-        Raises:
-            ValueError: If shapes are incompatible for multiplication, or
-                if the dimensionality combination isn't supported (e.g.
-                one 2D and one 3D operand).
- 
-        Example:
-            >>> a = Array([[1, 2], [3, 4]])       # shape (2, 2)
-            >>> b = Array([[5, 6], [7, 8]])       # shape (2, 2)
-            >>> a.matmul(b).unflatten()
-            [[19, 22], [43, 50]]
- 
-            >>> batch_a = Array.stack([a, a])     # shape (2, 2, 2)
-            >>> batch_b = Array.stack([b, b])     # shape (2, 2, 2)
-            >>> batch_a.matmul(batch_b).shape
-            (2, 2, 2)
+
+        Dispatches based on dimensionality: 2D@2D standard matmul, or
+        matching-batch 3D@3D batched matmul. General N-D broadcasting
+        matmul is not supported (deliberate scope limit).
         """
         if self.ndim == 2 and other.ndim == 2:
             return self._matmul_2d(other)
- 
         elif self.ndim == 3 and other.ndim == 3:
             batch = self.shape[0]
             other_batch = other.shape[0]
@@ -627,22 +545,17 @@ class Array:
                 for b in range(batch)
             ]
             return Array.stack(results)
- 
         else:
             raise ValueError(
                 f"matmul: unsupported ndim combination "
                 f"self.ndim={self.ndim}, other.ndim={other.ndim} "
                 f"(only 2D@2D and matching-batch 3D@3D are supported)"
             )
- 
+
     def __matmul__(self, other: "Array") -> "Array":
         """Operator overload for `self @ other`. Delegates to `matmul`."""
         return self.matmul(other)
 
-        
     def __repr__(self) -> str:
-        """
-        Return a concise developer-facing string representation showing
-        the array's shape, e.g. "Array(shape=(2, 3))".
-        """
+        """Concise developer-facing repr showing data and shape."""
         return f"Array(data={self._unflatten(self.data, self.shape)}, shape={self.shape})"
