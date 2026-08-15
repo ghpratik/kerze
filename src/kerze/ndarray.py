@@ -339,10 +339,16 @@ class Array:
 
     @classmethod
     def zeros(cls, shape):
+        """
+        Create an Array of the given shape, with every element set to 0.0.
+        """
         return cls([0.0] * cls._numel(shape), shape=shape)
 
     @classmethod
     def ones(cls, shape):
+        """
+        Create an Array of the given shape, with every element set to 1.0.
+        """
         return cls([1.0] * cls._numel(shape), shape=shape)
 
     @classmethod

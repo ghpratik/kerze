@@ -15,6 +15,7 @@ replace these once the `unbroadcast` helper is implemented.
 """
 
 from __future__ import annotations
+from .ndarray import Array
 
 from .tensor import Tensor
 
@@ -94,7 +95,7 @@ def mul(a: Tensor, b: Tensor) -> Tensor:
     Forward:
         out[i] = a[i] * b[i]  for every element i
 
-    Backward (product rule, applied elementwise):
+    Backward :
         d(out)/d(a) = b, so gradient flowing to `a` is (incoming_grad * b).
         d(out)/d(b) = a, so gradient flowing to `b` is (incoming_grad * a).
 
@@ -310,7 +311,7 @@ def pow(a: Tensor, exp: float) -> Tensor:
     Forward:
         out[i] = a[i]**(exp) for every element i
 
-    Backward (product rule, applied elementwise):
+    Backward :
         d(out)/d(a) = exp * a.pow(exp-1), so gradient flowing to `a` is (incoming_grad * exp * a.pow(exp-1)).
 
     Args:
@@ -367,7 +368,7 @@ def exp(a: Tensor) -> Tensor:
     Forward:
         out[i] = math.e**a[i] for every element i
 
-    Backward (product rule, applied elementwise):
+    Backward :
         d(out)/d(a) = e**a, so gradient flowing to `a` is (incoming_grad * e**self).
 
     Args:
@@ -418,7 +419,7 @@ def log(a: Tensor) -> Tensor:
     Forward:
         out[i] = math.log(a[i]) for every element i
 
-    Backward (product rule, applied elementwise):
+    Backward :
         d(out)/d(a) = 1/a, so gradient flowing to `a` is (incoming_grad * 1/a).
     
     Args:
@@ -466,7 +467,7 @@ def sqrt(a: Tensor) -> Tensor:
     Forward:
         out[i] = math.sqrt(a[i]) for every element i
 
-    Backward (product rule, applied elementwise):
+    Backward :
         d(out)/d(a) = 1/(2*sqrt(a)), so gradient flowing to `a` is (incoming_grad * 1/(2*sqrt(a))).
     """
     out_data = a.data.sqrt()
@@ -489,3 +490,57 @@ def sqrt(a: Tensor) -> Tensor:
 
 #---------------------------------------------Reduction Operations----------------------------------------------
 
+def sum(a: Tensor) -> Tensor:
+    """
+    Elementwise sum of Tensor: out = sum(a).
+
+    Forward:
+        out = sum(a[i]) for every element i
+
+    Backward:
+        d(out)/d(a) = 1, so gradient flowing to `a` is (incoming_grad * 1).
+    """
+    out_data = a.data.sum()
+    out = Tensor(
+        out_data,
+        requires_grad=(a.requires_grad),
+        _children=(a,),
+        _op="sum",
+    )
+
+    def _backward() -> None:
+        if a.requires_grad:
+            if a.grad is None:
+                a.zero_grad()
+            a.grad += out.grad * Array.ones(a.shape)
+
+    out._backward = _backward
+    return out
+
+def mean(a: Tensor) -> Tensor:
+    """
+    Elementwise mean of Tensor: out = mean(a).
+
+    Forward:
+        out = mean(a[i]) for every element i
+
+    Backward:
+        d(out)/d(a) = 1/n, so gradient flowing to `a` is (incoming_grad * 1/n).
+    """
+    n = a.data.size
+    out_data = a.data.mean()
+    out = Tensor(
+        out_data,
+        requires_grad=(a.requires_grad),
+        _children=(a,),
+        _op="mean",
+    )
+
+    def _backward() -> None:
+        if a.requires_grad:
+            if a.grad is None:
+                a.zero_grad()
+            a.grad += (out.grad / n) * Array.ones(a.shape)
+
+    out._backward = _backward
+    return out

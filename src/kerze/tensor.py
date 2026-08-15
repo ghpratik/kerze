@@ -330,6 +330,31 @@ class Tensor:
 
     #----------------------------------Reduction Functions----------------------------------
 
+    def sum(self) -> "Tensor":
+        """
+        Elementwise sum of this tensor.
+
+        Returns:
+            A new Tensor holding `self.data.sum()` (elementwise), with
+            `requires_grad=True` if this tensor requires grad, and a
+            `_backward` closure wired to accumulate gradient into this
+            tensor using the chain rule.
+        """
+        from .ops import sum
+        return sum(self)
+
+    def mean(self) -> "Tensor":
+        """
+        Elementwise mean of this tensor.
+
+        Returns:
+            A new Tensor holding `self.data.mean()` (elementwise), with
+            `requires_grad=True` if this tensor requires grad, and a
+            `_backward` closure wired to accumulate gradient into this
+            tensor using the chain rule.
+        """
+        from .ops import mean
+        return mean(self)
     #-------------------------------Comparison--------------------------------
 
     def __eq__(self, other: object) -> bool:

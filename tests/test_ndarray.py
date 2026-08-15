@@ -4,7 +4,7 @@ test_array.py
 Test suite for the Array class (pure-Python N-dimensional array).
 
 Run with:
-    pytest test_array.py -v
+    pytest ./tests/test_ndarray.py -v
 """
 
 import pytest
