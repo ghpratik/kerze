@@ -10,21 +10,25 @@ y = Array([[3.0, 4.0]])
 z = x + y
 
 print("Z: ", z)
-# a = Tensor(x, requires_grad=True)
-# b = Tensor(y, requires_grad=True)
+a = Tensor(x, requires_grad=True)
+b = Tensor(y, requires_grad=True)
 
-# c = a.sqrt()
-# out = c.mean()
-# # out = -c
-# print("Out Tensor: ", out.data)
+c = a.sqrt()
+d = c.mean()
+e = d + b
+out = e.sum()
+# out = -c
+print("Out Tensor: ", out.data)
 
-# print("c Tensor: ", c.data)
+out.backward()
 
-# out.backward()
+print("Gradient of a: ", a.grad)
+print("Gradient of b: ", b.grad)  
+print("Gradient of c: ", c.grad)
+print("Gradient of d: ", d.grad)
+print("Gradient of e: ", e.grad)    # [1.0, 1.0]
+print("Gradient of out: ", out.grad)    # [1.0, ]
 
-# print("Gradient of c: ", c.grad)  # [0.3333, 0.25][1., 1.,]
-# # print("Gradient of b: ", b.grad)  # [-1/9.0, -2/16], [-5., -2.] 
-# # print("Gradient of c: ", c.grad)  # [-1., -1]
 
-# print(out.data)
+print(out.data)
 
