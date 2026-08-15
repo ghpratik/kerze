@@ -287,6 +287,51 @@ class Tensor:
         """
         return id(self)
 
+    #--------------------------------Math Functions--------------------------------
+    def exp(self) -> "Tensor":
+        """
+        Elementwise exponential of this tensor.
+
+        Returns:
+            A new Tensor holding `math.exp(self.data)` (elementwise), with
+            `requires_grad=True` if this tensor requires grad, and a
+            `_backward` closure wired to accumulate gradient into this
+            tensor using the chain rule.
+        """
+        from .ops import exp
+        return exp(self)
+
+    def log(self) -> "Tensor":
+        """
+        Elementwise natural logarithm of this tensor.
+
+        Returns:
+            A new Tensor holding `math.log(self.data)` (elementwise), with
+            `requires_grad=True` if this tensor requires grad, and a
+            `_backward` closure wired to accumulate gradient into this
+            tensor using the chain rule.
+        """
+        from .ops import log
+        return log(self)
+
+    def sqrt(self) -> "Tensor":
+        """
+        Elementwise square root of this tensor.
+
+        Returns:
+            A new Tensor holding `math.sqrt(self.data)` (elementwise), with
+            `requires_grad=True` if this tensor requires grad, and a
+            `_backward` closure wired to accumulate gradient into this
+            tensor using the chain rule.
+        """
+        from .ops import sqrt
+        return sqrt(self)
+
+
+    #----------------------------------Reduction Functions----------------------------------
+
+    #-------------------------------Comparison--------------------------------
+
     def __eq__(self, other: object) -> bool:
         """
         Equality by object identity, matching `__hash__`.

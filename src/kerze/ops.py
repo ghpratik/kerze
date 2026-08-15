@@ -374,7 +374,7 @@ def exp(a: Tensor) -> Tensor:
         a: First operand.
 
     Returns:
-        A new Tensor holding `a.data.pow(exp)` (elementwise), with
+        A new Tensor holding `math.exp(a.data)` (elementwise), with
         `requires_grad=True` if either input requires grad, and a
         `_backward` closure wired to accumulate gradient into both
         `a` and `b` using the product rule.
@@ -394,7 +394,7 @@ def exp(a: Tensor) -> Tensor:
         >>> b.grad.data   # d(out)/db = -a/b**2
         [-0.125, -0.2222]
     """
-    out_data = math.exp**a
+    out_data = a.data.exp()
     out = Tensor(
         out_data,
         requires_grad=(a.requires_grad),
@@ -411,4 +411,81 @@ def exp(a: Tensor) -> Tensor:
     out._backward = _backward
     return out
 
+def log(a: Tensor) -> Tensor:
+    """
+    Elementwise natural logarithm of Tensor: out = log(a).
+
+    Forward:
+        out[i] = math.log(a[i]) for every element i
+
+    Backward (product rule, applied elementwise):
+        d(out)/d(a) = 1/a, so gradient flowing to `a` is (incoming_grad * 1/a).
+    
+    Args:
+        a: First operand.
+    
+    Returns:
+        A new Tensor holding `math.log(a.data)` (elementwise), with
+        `requires_grad=True` if either input requires grad, and a 
+        `_backward` closure wired to accumulate gradient into both
+        `a` and `b` using the product rule.
+
+    Raises:
+        ValueError: If `a.shape != b.shape`.
+
+    Example:
+        >>> a = Tensor([2.0, 6.0], requires_grad=True)
+        >>> out = log(a)
+        >>> out.data.data
+        [0.6931, 1.7918]
+        >>> out.backward()
+        >>> a.grad.data
+        [0.5, 0.1667]
+    """
+    out_data = a.data.log()
+    out = Tensor(
+        out_data,
+        requires_grad=(a.requires_grad),
+        _children=(a,),
+        _op="log",
+    )
+
+    def _backward() -> None:
+        if a.requires_grad:
+            if a.grad is None:
+                a.zero_grad()
+            a.grad += (1 / a.data) * out.grad
+
+    out._backward = _backward
+    return out
+
+def sqrt(a: Tensor) -> Tensor:
+    """
+    Elementwise square root of Tensor: out = sqrt(a).
+
+    Forward:
+        out[i] = math.sqrt(a[i]) for every element i
+
+    Backward (product rule, applied elementwise):
+        d(out)/d(a) = 1/(2*sqrt(a)), so gradient flowing to `a` is (incoming_grad * 1/(2*sqrt(a))).
+    """
+    out_data = a.data.sqrt()
+    out = Tensor(
+        out_data,
+        requires_grad=(a.requires_grad),
+        _children=(a,),
+        _op="sqrt",
+    )
+
+    def _backward() -> None:
+        if a.requires_grad:
+            if a.grad is None:
+                a.zero_grad()
+            a.grad += (1 / (2 * out.data)) * out.grad
+
+    out._backward = _backward
+    return out
+
+
+#---------------------------------------------Reduction Operations----------------------------------------------
 
