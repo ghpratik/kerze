@@ -149,12 +149,13 @@ class Array:
     def ndim(self) -> int:
         """The number of dimensions (axes) of this array."""
         return len(self.shape)
-
+    
+#----------------------------------Shape-----------------------------------------------------------
     @property
     def size(self) -> int:
         """The total number of elements in this array."""
         return self._numel(self.shape)
-
+    
     def reshape(self, new_shape):
         """Reshape to a new shape with the same total element count."""
         if self._numel(new_shape) != self.size:
@@ -170,6 +171,67 @@ class Array:
         result.shape = new_shape
         result.strides = new_strides
         return result
+
+    def squeeze(self, axis: int = None) -> "Array":
+        """
+        Remove size-1 dimensions from the shape.
+
+        If `axis` is None (default), removes all size-1 dimensions.
+        If `axis` is an int, removes only that dimension if it has size 1,
+        otherwise raises ValueError.
+
+        Returns:
+            A new Array with the squeezed shape. Shares the same data buffer.
+        """
+        if axis is None:
+            new_shape = tuple(d for d in self.shape if d != 1)
+        else:
+            if axis < -self.ndim or axis >= self.ndim:
+                raise ValueError(
+                    f"Axis {axis} is out of bounds for array of dimension {self.ndim}"
+                )
+
+            if axis < 0:
+                axis += self.ndim
+
+            if self.shape[axis] != 1:
+                raise ValueError(
+                    f"Cannot squeeze axis {axis} with size {self.shape[axis]}"
+                )
+
+            new_shape = (
+                self.shape[:axis] +
+                self.shape[axis + 1:]
+            )
+
+        return Array(self.data, shape=new_shape)
+
+    def unsqueeze(self, axis: int) -> "Array":
+        """
+        Add a size-1 dimension at the specified axis.
+
+        Args:
+            axis: The position to insert the new dimension. Can be negative
+                to count from the end (e.g., -1 adds a new last dimension).
+
+        Returns:
+            A new Array with the unsqueezed shape. Shares the same data buffer.
+        """
+        if axis < 0:
+            axis += self.ndim + 1
+
+        if axis < 0 or axis > self.ndim:
+            raise ValueError(
+                f"Axis {axis} is out of bounds for array of dimension {self.ndim}"
+            )
+
+        new_shape = (
+            self.shape[:axis] +
+            (1,) +
+            self.shape[axis:]
+        )
+
+        return Array(self.data, shape=new_shape)
 
     @classmethod
     def zeros(cls, shape):
@@ -437,6 +499,10 @@ class Array:
         """Elementwise square root. Raises ValueError for negative elements."""
         return Array([math.sqrt(x) for x in self.data], shape=self.shape)
 
+    def tanh(self) -> "Array":
+        """Elementwise hyperbolic tangent."""
+        return Array([math.tanh(x) for x in self.data], shape=self.shape)
+
     # -------------------------------------------------------------------
     # Reduction operations — now axis-aware
     # -------------------------------------------------------------------
@@ -521,8 +587,50 @@ class Array:
         s = self.sum(axis=axis, keepdims=keepdims)
         return s / n
 
+    def max(self, axis: int = None, keepdims: bool = False) -> "Array":
+        """
+        Maximum of elements along an axis, or over the whole array.
+
+        Same `axis`/`keepdims` semantics as `sum`. Implemented by iterating
+        over all indices and keeping track of the maximum value for each
+        output position.
+
+        Example:
+            >>> a = Array([[1, 2, 3], [4, 5, 6]])
+            >>> m = a.max(axis=0)
+            >>> Array._unflatten(m.data, m.shape)
+            [4, 5, 6]
+        """
+        if axis is None:
+            max_val = max(self.data)
+            out_shape = tuple(1 for _ in self.shape) if keepdims else (1,)
+            return Array([max_val], shape=out_shape)
+
+        if axis < 0:
+            axis = self.ndim + axis
+
+        reduced_shape = list(self.shape)
+        reduced_shape[axis] = 1
+        reduced_shape = tuple(reduced_shape)
+
+        result = Array.full(float("-inf"), reduced_shape)
+        for idx in itertools.product(*[range(d) for d in self.shape]):
+            out_idx = list(idx)
+            out_idx[axis] = 0
+            current_max = result.get(*out_idx)
+            new_val = self.get(*idx)
+            if new_val > current_max:
+                result.set(new_val, *out_idx)
+
+        if not keepdims:
+            final_shape = tuple(d for i, d in enumerate(reduced_shape) if i != axis)
+            if final_shape == ():
+                final_shape = (1,)
+            result = result.reshape(final_shape)
+        return result
+
     # -------------------------------------------------------------------
-    # Matrix multiplication
+    # Matrix multiplication - Linear Algebra
     # -------------------------------------------------------------------
 
     def _matmul_2d(self, other: "Array") -> "Array":

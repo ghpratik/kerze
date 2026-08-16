@@ -8,6 +8,7 @@ Run with:
 """
 
 import pytest
+import math
 from kerze.ndarray import Array  # rename import to match your actual filename
 
 
@@ -194,6 +195,181 @@ class TestTranspose:
         tt = arr.transpose().transpose()
         assert tt.shape == arr.shape
         assert tt.strides == arr.strides
+
+
+#----------------------------------------------------------------------------
+# Squeeze and Unsqueeze
+#---------------------------------------------------------------------------
+class TestArraySqueeze:
+
+    def test_squeeze_all_singleton_dimensions(self):
+        a = Array([[[[1, 2, 3]]]], shape=(1, 1, 1, 3))
+
+        result = a.squeeze()
+
+        assert result.shape == (3,)
+        assert result.data == [1, 2, 3]
+
+    def test_squeeze_no_singleton_dimensions(self):
+        a = Array([[1, 2, 3], [4, 5, 6]])
+
+        result = a.squeeze()
+
+        assert result.shape == (2, 3)
+        assert result.data == [1, 2, 3, 4, 5, 6]
+
+    def test_squeeze_specific_axis(self):
+        a = Array([1, 2, 3], shape=(1, 3))
+
+        result = a.squeeze(axis=0)
+
+        assert result.shape == (3,)
+        assert result.data == [1, 2, 3]
+
+    def test_squeeze_middle_axis(self):
+        a = Array([1, 2, 3, 4], shape=(2, 1, 2))
+
+        result = a.squeeze(axis=1)
+
+        assert result.shape == (2, 2)
+        assert result.data == [1, 2, 3, 4]
+
+    def test_squeeze_negative_axis(self):
+        a = Array([1, 2, 3], shape=(3, 1))
+
+        result = a.squeeze(axis=-1)
+
+        assert result.shape == (3,)
+        assert result.data == [1, 2, 3]
+
+    def test_squeeze_negative_middle_axis(self):
+        a = Array([1, 2, 3, 4], shape=(2, 1, 2))
+
+        result = a.squeeze(axis=-2)
+
+        assert result.shape == (2, 2)
+        assert result.data == [1, 2, 3, 4]
+
+    def test_squeeze_multiple_singleton_dimensions(self):
+        a = Array([1, 2], shape=(1, 2, 1, 1))
+
+        result = a.squeeze()
+
+        assert result.shape == (2,)
+        assert result.data == [1, 2]
+
+    def test_squeeze_axis_with_non_singleton_dimension(self):
+        a = Array([1, 2, 3, 4], shape=(2, 2))
+
+        with pytest.raises(ValueError):
+            a.squeeze(axis=0)
+
+    def test_squeeze_invalid_positive_axis(self):
+        a = Array([1, 2, 3], shape=(1, 3))
+
+        with pytest.raises(ValueError):
+            a.squeeze(axis=2)
+
+    def test_squeeze_invalid_negative_axis(self):
+        a = Array([1, 2, 3], shape=(1, 3))
+
+        with pytest.raises(ValueError):
+            a.squeeze(axis=-3)
+
+
+class TestArrayUnsqueeze:
+
+    def test_unsqueeze_axis_zero(self):
+        a = Array([1, 2, 3])
+
+        result = a.unsqueeze(axis=0)
+
+        assert result.shape == (1, 3)
+        assert result.data == [1, 2, 3]
+
+    def test_unsqueeze_axis_one(self):
+        a = Array([1, 2, 3])
+
+        result = a.unsqueeze(axis=1)
+
+        assert result.shape == (3, 1)
+        assert result.data == [1, 2, 3]
+
+    def test_unsqueeze_2d_axis_zero(self):
+        a = Array([[1, 2], [3, 4]])
+
+        result = a.unsqueeze(axis=0)
+
+        assert result.shape == (1, 2, 2)
+        assert result.data == [1, 2, 3, 4]
+
+    def test_unsqueeze_2d_middle_axis(self):
+        a = Array([[1, 2], [3, 4]])
+
+        result = a.unsqueeze(axis=1)
+
+        assert result.shape == (2, 1, 2)
+        assert result.data == [1, 2, 3, 4]
+
+    def test_unsqueeze_2d_last_axis(self):
+        a = Array([[1, 2], [3, 4]])
+
+        result = a.unsqueeze(axis=2)
+
+        assert result.shape == (2, 2, 1)
+        assert result.data == [1, 2, 3, 4]
+
+    def test_unsqueeze_negative_one(self):
+        a = Array([1, 2, 3])
+
+        result = a.unsqueeze(axis=-1)
+
+        assert result.shape == (3, 1)
+        assert result.data == [1, 2, 3]
+
+    def test_unsqueeze_negative_two(self):
+        a = Array([1, 2, 3])
+
+        result = a.unsqueeze(axis=-2)
+
+        assert result.shape == (1, 3)
+        assert result.data == [1, 2, 3]
+
+    def test_unsqueeze_negative_axis_2d(self):
+        a = Array([[1, 2], [3, 4]])
+
+        result = a.unsqueeze(axis=-1)
+
+        assert result.shape == (2, 2, 1)
+        assert result.data == [1, 2, 3, 4]
+
+    def test_unsqueeze_invalid_positive_axis(self):
+        a = Array([1, 2, 3])
+
+        with pytest.raises(ValueError):
+            a.unsqueeze(axis=2)
+
+    def test_unsqueeze_invalid_negative_axis(self):
+        a = Array([1, 2, 3])
+
+        with pytest.raises(ValueError):
+            a.unsqueeze(axis=-3)
+
+    def test_unsqueeze_squeeze_round_trip(self):
+        a = Array([[1, 2], [3, 4]])
+
+        result = a.unsqueeze(axis=1).squeeze(axis=1)
+
+        assert result.shape == a.shape
+        assert result.data == a.data
+
+    def test_squeeze_unsqueeze_round_trip(self):
+        a = Array([1, 2, 3], shape=(1, 3))
+
+        result = a.squeeze(axis=0).unsqueeze(axis=0)
+
+        assert result.shape == a.shape
+        assert result.data == a.data
 
 
 # ---------------------------------------------------------------------------
@@ -588,6 +764,79 @@ class TestMathFunctions:
         with pytest.raises(ValueError):
             a.sqrt()
 
+class TestArrayTanh:
+
+    def test_tanh_basic(self):
+        a = Array([0.0, 1.0, -1.0])
+
+        result = a.tanh()
+
+        expected = [
+            math.tanh(0.0),
+            math.tanh(1.0),
+            math.tanh(-1.0),
+        ]
+
+        assert result.shape == (3,)
+        assert result.data == expected
+
+    def test_tanh_zero(self):
+        a = Array([0.0])
+
+        result = a.tanh()
+
+        assert result.data == [0.0]
+
+    def test_tanh_negative_values(self):
+        a = Array([-1.0, -2.0, -3.0])
+
+        result = a.tanh()
+
+        expected = [math.tanh(x) for x in [-1.0, -2.0, -3.0]]
+
+        assert result.data == expected
+
+    def test_tanh_positive_values(self):
+        a = Array([1.0, 2.0, 3.0])
+
+        result = a.tanh()
+
+        expected = [math.tanh(x) for x in [1.0, 2.0, 3.0]]
+
+        assert result.data == expected
+
+    def test_tanh_2d(self):
+        a = Array([
+            [0.0, 1.0],
+            [-1.0, 2.0],
+        ])
+
+        result = a.tanh()
+
+        expected = [
+            math.tanh(0.0),
+            math.tanh(1.0),
+            math.tanh(-1.0),
+            math.tanh(2.0),
+        ]
+
+        assert result.shape == (2, 2)
+        assert result.data == expected
+
+    def test_tanh_preserves_shape(self):
+        a = Array([1.0, 2.0, 3.0, 4.0], shape=(2, 2))
+
+        result = a.tanh()
+
+        assert result.shape == a.shape
+
+    def test_tanh_output_range(self):
+        a = Array([-100.0, -2.0, 0.0, 2.0, 100.0])
+
+        result = a.tanh()
+
+        assert all(-1.0 <= x <= 1.0 for x in result.data)
+
 
 # ---------------------------------------------------------------------------
 # Reduction operations — sum / mean, full and axis-aware
@@ -646,6 +895,234 @@ class TestSumMean:
         # should not raise, since (1,3) broadcasts against (2,3)
         combined = a + col_sums
         assert combined.shape == (2, 3)
+
+class TestArrayMax:
+
+    def test_max_all_elements(self):
+        a = Array([
+            [1, 2, 3],
+            [4, 5, 6],
+        ])
+
+        result = a.max()
+
+        assert result.shape == (1,)
+        assert result.data == [6]
+
+    def test_max_all_elements_keepdims(self):
+        a = Array([
+            [1, 2, 3],
+            [4, 5, 6],
+        ])
+
+        result = a.max(keepdims=True)
+
+        assert result.shape == (1, 1)
+        assert result.data == [6]
+
+    def test_max_axis_0(self):
+        a = Array([
+            [1, 2, 3],
+            [4, 5, 6],
+        ])
+
+        result = a.max(axis=0)
+
+        assert result.shape == (3,)
+        assert result.data == [4, 5, 6]
+
+    def test_max_axis_0_keepdims(self):
+        a = Array([
+            [1, 2, 3],
+            [4, 5, 6],
+        ])
+
+        result = a.max(axis=0, keepdims=True)
+
+        assert result.shape == (1, 3)
+        assert result.data == [4, 5, 6]
+
+    def test_max_axis_1(self):
+        a = Array([
+            [1, 2, 3],
+            [4, 5, 6],
+        ])
+
+        result = a.max(axis=1)
+
+        assert result.shape == (2,)
+        assert result.data == [3, 6]
+
+    def test_max_axis_1_keepdims(self):
+        a = Array([
+            [1, 2, 3],
+            [4, 5, 6],
+        ])
+
+        result = a.max(axis=1, keepdims=True)
+
+        assert result.shape == (2, 1)
+        assert result.data == [3, 6]
+
+    def test_max_negative_axis(self):
+        a = Array([
+            [1, 2, 3],
+            [4, 5, 6],
+        ])
+
+        result = a.max(axis=-1)
+
+        assert result.shape == (2,)
+        assert result.data == [3, 6]
+
+    def test_max_negative_axis_keepdims(self):
+        a = Array([
+            [1, 2, 3],
+            [4, 5, 6],
+        ])
+
+        result = a.max(axis=-2, keepdims=True)
+
+        assert result.shape == (1, 3)
+        assert result.data == [4, 5, 6]
+
+    def test_max_with_negative_values(self):
+        a = Array([
+            [-5, -2, -8],
+            [-10, -1, -3],
+        ])
+
+        result = a.max(axis=0)
+
+        assert result.shape == (3,)
+        assert result.data == [-5, -1, -3]
+
+    def test_max_all_negative_values(self):
+        a = Array([
+            [-5, -2],
+            [-10, -8],
+        ])
+
+        result = a.max()
+
+        assert result.shape == (1,)
+        assert result.data == [-2]
+
+    def test_max_single_element(self):
+        a = Array([[42]])
+
+        result = a.max()
+
+        assert result.shape == (1,)
+        assert result.data == [42]
+
+    def test_max_single_element_axis_0(self):
+        a = Array([[42]])
+
+        result = a.max(axis=0)
+
+        assert result.shape == (1,)
+        assert result.data == [42]
+
+    def test_max_single_element_axis_1(self):
+        a = Array([[42]])
+
+        result = a.max(axis=1)
+
+        assert result.shape == (1,)
+        assert result.data == [42]
+
+    def test_max_1d_array(self):
+        a = Array([1, 7, 3, 5, 2])
+
+        result = a.max()
+
+        assert result.shape == (1,)
+        assert result.data == [7]
+
+    def test_max_1d_axis_0(self):
+        a = Array([1, 7, 3, 5, 2])
+
+        result = a.max(axis=0)
+
+        assert result.shape == (1,)
+        assert result.data == [7]
+
+    def test_max_1d_axis_negative(self):
+        a = Array([1, 7, 3, 5, 2])
+
+        result = a.max(axis=-1)
+
+        assert result.shape == (1,)
+        assert result.data == [7]
+
+    def test_max_3d_axis_0(self):
+        a = Array([
+            [
+                [1, 2],
+                [3, 4],
+            ],
+            [
+                [5, 6],
+                [7, 8],
+            ],
+        ])
+
+        result = a.max(axis=0)
+
+        assert result.shape == (2, 2)
+        assert result.data == [5, 6, 7, 8]
+
+    def test_max_3d_axis_1(self):
+        a = Array([
+            [
+                [1, 2],
+                [3, 4],
+            ],
+            [
+                [5, 6],
+                [7, 8],
+            ],
+        ])
+
+        result = a.max(axis=1)
+
+        assert result.shape == (2, 2)
+        assert result.data == [3, 4, 7, 8]
+
+    def test_max_3d_axis_2(self):
+        a = Array([
+            [
+                [1, 2],
+                [3, 4],
+            ],
+            [
+                [5, 6],
+                [7, 8],
+            ],
+        ])
+
+        result = a.max(axis=2)
+
+        assert result.shape == (2, 2)
+        assert result.data == [2, 4, 6, 8]
+
+    def test_max_3d_keepdims(self):
+        a = Array([
+            [
+                [1, 2],
+                [3, 4],
+            ],
+            [
+                [5, 6],
+                [7, 8],
+            ],
+        ])
+
+        result = a.max(axis=2, keepdims=True)
+
+        assert result.shape == (2, 2, 1)
+        assert result.data == [2, 4, 6, 8]
 
 
 # ---------------------------------------------------------------------------

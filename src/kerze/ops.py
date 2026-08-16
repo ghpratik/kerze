@@ -27,6 +27,16 @@ from .tensor import Tensor
 import math
 
 
+def _ensure_tensor(x) -> Tensor:
+    if isinstance(x, Tensor):
+        return x
+
+    return Tensor(
+        Array(x),
+        requires_grad=False,
+    )
+
+
 # ----------------------------------------------ARITHMETIC--------------------------------------------------
 
 def add(a: Tensor, b: Tensor) -> Tensor:
@@ -69,6 +79,8 @@ def add(a: Tensor, b: Tensor) -> Tensor:
         >>> b.grad.data   # gradient summed over the broadcast batch dim
         [2.0, 2.0, 2.0]
     """
+    a = _ensure_tensor(a)
+    b = _ensure_tensor(b)
     out_data = a.data + b.data  # Array.__add__ already handles broadcasting
     out = Tensor(
         out_data,
@@ -126,6 +138,8 @@ def sub(a: Tensor, b: Tensor) -> Tensor:
         >>> b.grad.data
         [-1.0, -1.0]
     """
+    a = _ensure_tensor(a)
+    b = _ensure_tensor(b)
     out_data = a.data - b.data
     out = Tensor(
         out_data,
@@ -184,6 +198,8 @@ def mul(a: Tensor, b: Tensor) -> Tensor:
         >>> b.grad.data   # d(out)/db = a
         [2.0, 3.0]
     """
+    a = _ensure_tensor(a)
+    b = _ensure_tensor(b)
     out_data = a.data * b.data
     out = Tensor(
         out_data,
@@ -240,6 +256,8 @@ def div(a: Tensor, b: Tensor) -> Tensor:
         >>> out.data.data
         [0.5, 2.0]
     """
+    a = _ensure_tensor(a)
+    b = _ensure_tensor(b)
     out_data = a.data / b.data
     out = Tensor(
         out_data,
@@ -332,7 +350,7 @@ def pow(a: Tensor, exp: float) -> Tensor:
         if a.requires_grad:
             if a.grad is None:
                 a.zero_grad()
-            a.grad += exp * (out.data / a.data) * out.grad
+            a.grad += exp * a.data ** (exp - 1) * out.grad
 
     out._backward = _backward
     return out
@@ -600,3 +618,166 @@ def mean(a: Tensor, axis: int = None, keepdims: bool = False) -> Tensor:
 
     out._backward = _backward
     return out
+
+def max(a: Tensor, axis: int = None, keepdims: bool = False) -> Tensor:
+    """
+    Max of Tensor elements along an axis, or over the whole tensor.
+
+    Forward:
+        Delegates to `Array.max`, matching its `axis`/`keepdims`
+        semantics exactly.
+
+    Backward:
+        d(out)/d(a_i) = 1 for the element a_i that was the maximum in the forward pass, and 0 for all other elements. The gradient flowing back to `a` is the incoming gradient (out.grad) broadcast back out to `a`'s original shape, but only the maximum element receives the gradient.
+
+    Args:
+        a: The Tensor to reduce.
+        axis: Which dimension to take the maximum over (None = max of everything).
+        keepdims: Whether to keep the reduced dimension as size 1 in the output shape.
+
+    Returns:
+        A new Tensor holding the maximum, with shape determined by `axis`/`keepdims` exactly as in `Array.max`.
+
+    Example:
+        >>> a = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+        >>> out = max(a, axis=0)      # shape (3,)
+        >>> out.data.data
+        [4.0, 5.0, 6.0]
+        >>> out.backward()
+        >>> a.grad.data               # only the max elements get gradient 1
+        [0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
+    """
+    out_data = a.data.max(axis=axis, keepdims=keepdims)
+    out = Tensor(
+        out_data,
+        requires_grad=a.requires_grad,
+        _children=(a,),
+        _op="max",
+    )
+
+    def _backward():
+        if not a.requires_grad:
+            return
+
+        if a.grad is None:
+            a.zero_grad()
+
+        # 1. Get output gradient in a shape
+        #    that can broadcast back to `a`.
+        grad = out.grad
+
+        if axis is not None and not keepdims:
+            grad = grad.unsqueeze(axis)
+
+        grad = grad.broadcast_to(a.shape)
+
+        # 2. Build max mask
+        max_values = out.data
+
+        if axis is not None and not keepdims:
+            max_values = max_values.unsqueeze(axis)
+
+        max_values = max_values.broadcast_to(a.shape)
+
+        max_mask = a.data == max_values
+
+        # 3. Gradient
+        a.grad += max_mask * grad
+
+    out._backward = _backward
+    return out
+
+
+#---------------------------------------Activation Functions---------------------------------------
+
+def relu(a: Tensor) -> Tensor:
+    """
+    Elementwise ReLU activation: out = max(0, a). Unary — no broadcasting
+    involved.
+
+    Backward:
+        d(out)/d(a) = 1 if a > 0 else 0, so gradient flowing to `a` is
+        (incoming_grad * (a.data > 0)).
+    """
+    out_data = [math.max(0, x) for x in a.data.data]
+    out = Tensor(
+        out_data,
+        requires_grad=a.requires_grad,
+        _children=(a,),
+        _op="relu",
+    )
+
+    def _backward() -> None:
+        if a.requires_grad:
+            if a.grad is None:
+                a.zero_grad()
+            a.grad += (a.data > 0) * out.grad
+
+    out._backward = _backward
+    return out
+
+def sigmoid(a: Tensor) -> Tensor:
+    """
+    Elementwise Sigmoid activation: out = 1 / (1 + exp(-a)). Unary — no broadcasting
+    involved.
+
+    Backward:
+        d(out)/d(a) = out * (1 - out), so gradient flowing to `a` is
+        (incoming_grad * out.data * (1 - out.data)).
+    """
+    out_data = 1 / (1 + (-a.data).exp())
+    out = Tensor(
+        out_data,
+        requires_grad=a.requires_grad,
+        _children=(a,),
+        _op="sigmoid",
+    )
+
+    def _backward() -> None:
+        if a.requires_grad:
+            if a.grad is None:
+                a.zero_grad()
+            a.grad += out.data * (1 - out.data) * out.grad
+
+    out._backward = _backward
+    return out
+
+def tanh(a: Tensor) -> Tensor:
+    """
+    Elementwise Tanh activation: out = tanh(a). Unary — no broadcasting
+    involved.
+
+    Backward:
+        d(out)/d(a) = 1 - out^2, so gradient flowing to `a` is
+        (incoming_grad * (1 - out.data ** 2)).
+    """
+    out_data = a.data.tanh()
+    out = Tensor(
+        out_data,
+        requires_grad=a.requires_grad,
+        _children=(a,),
+        _op="tanh",
+    )
+
+    def _backward() -> None:
+        if a.requires_grad:
+            if a.grad is None:
+                a.zero_grad()
+            a.grad += (1 - out.data ** 2) * out.grad
+
+    out._backward = _backward
+    return out
+
+def gelu(a: Tensor) -> Tensor:
+    """
+    Elementwise GELU activation: out = 0.5 * a * (1 + tanh(sqrt(2/pi) * (a + 0.044715 * a^3))). Unary — no broadcasting
+    involved.
+
+    Backward:
+        No _backward() inside GELU. Computation graph will automatically calculate the gradient using the chain rule, so we don't need to manually implement the backward pass here.
+    """
+    c = math.sqrt(2.0 / math.pi)
+
+    u = c * (a + 0.044715 * a**3)
+
+    return 0.5 * a * (1.0 + tanh(u))
