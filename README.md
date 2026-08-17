@@ -1,41 +1,12 @@
 # kerze
 
-A lightweight, educational PyTorch-like machine learning library built from scratch in Python.
+A lightweight, PyTorch-like machine learning library built from scratch in Python.
 
 **kerze** combines a small NumPy-inspired multidimensional array implementation with an automatic differentiation engine and a neural-network API.
 
 The project is designed to make the internals of numerical computing and deep learning easier to understand by keeping the implementation small, explicit, and readable.
 
-> kerze is primarily an educational and experimental project, not a replacement for NumPy, PyTorch, or other production-grade numerical computing frameworks.
-
----
-
-## Features
-
-- NumPy-inspired multidimensional `Array`
-- Broadcasting
-- Elementwise arithmetic operations
-- Matrix multiplication
-- Reductions such as `sum`, `mean`, and `max`
-- Reshape, transpose, squeeze, and other shape operations
-- Automatic differentiation
-- Reverse-mode backpropagation
-- Computation graphs
-- Gradient accumulation
-- Gradient broadcasting / unbroadcasting
-- Basic mathematical operations
-- Activation functions
-- Neural-network modules
-- Learnable `Parameter`s
-- `Sequential` models
-- Linear layers
-- Loss functions
-- Functional neural-network API
-- Parameter initialization
-- Training/evaluation modes
-- PyTorch-like API design
-
----
+> ⚠️ **Warning:** kerze is primarily an experimental project, not a replacement for NumPy, PyTorch, or other production-grade numerical computing frameworks and it currently supports **CPU execution only**. There is **no GPU/CUDA support**.
 
 # Installation
 
@@ -89,6 +60,35 @@ loss = y.mean()
 loss.backward()
 ```
 
+---
+
+## Features
+
+- NumPy-inspired multidimensional `Array`
+- Broadcasting
+- Elementwise arithmetic operations
+- Matrix multiplication
+- Reductions such as `sum`, `mean`, and `max`
+- Reshape, transpose, squeeze, and other shape operations
+- Automatic differentiation
+- Reverse-mode backpropagation
+- Computation graphs
+- Gradient accumulation
+- Gradient broadcasting / unbroadcasting
+- Basic mathematical operations
+- Activation functions
+- Neural-network modules
+- Learnable Parameters
+- Sequential models
+- Linear layers
+- Loss functions
+- Functional neural-network API
+- Parameter initialization
+- Training/evaluation modes
+- PyTorch-like API design
+
+---
+
 ## Neural Network API
 
 Kerze provides a small PyTorch-inspired `nn` API:
@@ -126,12 +126,6 @@ loss.backward()
 
 Each operation defines its own backward rule, allowing gradients to propagate through arithmetic, reductions, activations, matrix multiplication, and other supported operations.
 
-### Autograd Graph
-
-<!-- Place the autograd tree/demo image here -->
-
-![Kerze Autograd Graph](docs/images/autograd-tree.png)
-
 ## Scope & Limitations
 
 Kerze is intentionally **small and educational**.
@@ -160,4 +154,6 @@ Detailed documentation is available in [`docs/`](docs/):
 
 Kerze is an experimental/learning project and is actively evolving.
 
-> ⚠️ **Warning:** Kerze currently supports **CPU execution only**. There is **no GPU/CUDA support**.
+## License
+
+Kerze is licensed under the [MIT License](LICENSE).
