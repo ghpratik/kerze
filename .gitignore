@@ -1,3 +1,6 @@
 __pycache__
 .pytest_cache
 kerze.egg-info
+.pypirc
+/dist
+/.venv
