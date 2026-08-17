@@ -158,15 +158,11 @@ Result:
 
 because:
 
-[
-y=x^2
-]
+$$y=x^2$$
 
 and therefore:
 
-[
-\frac{dy}{dx}=2x=4
-]
+$$\frac{dy}{dx}=2x=4$$
 
 ---
 
@@ -347,15 +343,11 @@ z.backward()
 
 Since:
 
-[
-z=x^2+x
-]
+$$z=x^2+x$$
 
 the derivative is:
 
-[
-\frac{dz}{dx}=2x+1
-]
+$$\frac{dz}{dx}=2x+1$$
 
 At `x = 2`:
 
@@ -422,19 +414,13 @@ z = a + b
 
 Equivalent to:
 
-[
-z=a+b
-]
+$$z=a+b$$
 
 Backward:
 
-[
-\frac{\partial z}{\partial a}=1
-]
+$$\frac{\partial z}{\partial a}=1$$
 
-[
-\frac{\partial z}{\partial b}=1
-]
+$$\frac{\partial z}{\partial b}=1$$
 
 Broadcasting is supported.
 
@@ -460,13 +446,13 @@ z = a - b
 
 Backward:
 
-[
+$$
 \frac{\partial z}{\partial a}=1
-]
+$$
 
-[
+$$
 \frac{\partial z}{\partial b}=-1
-]
+$$
 
 ---
 
@@ -480,13 +466,13 @@ Elementwise multiplication.
 
 Backward uses the product rule:
 
-[
+$$
 \frac{\partial z}{\partial a}=b
-]
+$$
 
-[
+$$
 \frac{\partial z}{\partial b}=a
-]
+$$
 
 The implementation also handles broadcasting during backward propagation.
 
@@ -500,18 +486,18 @@ z = a / b
 
 Backward:
 
-[
+$$
 \frac{\partial z}{\partial a}=\frac{1}{b}
-]
+$$
 
 and
 
-[
+$$
 \frac{\partial z}{\partial b}
-=============================
+=
 
 -\frac{a}{b^2}
-]
+$$
 
 ---
 
@@ -523,9 +509,9 @@ z = -a
 
 Backward:
 
-[
+$$
 \frac{dz}{da}=-1
-]
+$$
 
 ---
 
@@ -537,15 +523,15 @@ z = a ** 2
 
 More generally:
 
-[
+$$
 z=a^p
-]
+$$
 
 Backward:
 
-[
+$$
 \frac{dz}{da}=p a^{p-1}
-]
+$$
 
 The exponent is currently a scalar Python value rather than a differentiable tensor.
 
@@ -634,15 +620,15 @@ y = x.exp()
 
 Computes:
 
-[
+$$
 e^x
-]
+$$
 
 Derivative:
 
-[
+$$
 \frac{d}{dx}e^x=e^x
-]
+$$
 
 The implementation can therefore use the output directly during backward propagation.
 
@@ -656,15 +642,15 @@ y = x.log()
 
 Computes:
 
-[
+$$
 \ln(x)
-]
+$$
 
 Derivative:
 
-[
+$$
 \frac{d}{dx}\ln(x)=\frac{1}{x}
-]
+$$
 
 ---
 
@@ -676,18 +662,18 @@ y = x.sqrt()
 
 Computes:
 
-[
+$$
 \sqrt{x}
-]
+$$
 
 Derivative:
 
-[
+$$
 \frac{d}{dx}\sqrt{x}
-====================
+=
 
 \frac{1}{2\sqrt{x}}
-]
+$$
 
 ---
 
@@ -713,15 +699,15 @@ y = x.sum()
 
 Computes:
 
-[
+$$
 y=\sum_i x_i
-]
+$$
 
 The derivative with respect to every contributing element is:
 
-[
+$$
 \frac{\partial y}{\partial x_i}=1
-]
+$$
 
 Therefore the incoming gradient is broadcast back to the original tensor shape.
 
@@ -747,15 +733,15 @@ y = x.mean()
 
 Computes:
 
-[
+$$
 y=\frac{1}{n}\sum_i x_i
-]
+$$
 
 Derivative:
 
-[
+$$
 \frac{\partial y}{\partial x_i}=\frac{1}{n}
-]
+$$
 
 The gradient is expanded back to the original shape after applying the `1/n` scaling.
 
@@ -819,27 +805,27 @@ c = a @ b
 
 Forward:
 
-[
+$$
 C=AB
-]
+$$
 
 Backward:
 
-[
+$$
 \frac{\partial L}{\partial A}
-=============================
+=
 
 \frac{\partial L}{\partial C}B^T
-]
+$$
 
 and:
 
-[
+$$
 \frac{\partial L}{\partial B}
-=============================
+=
 
 A^T\frac{\partial L}{\partial C}
-]
+$$
 
 The current implementation supports:
 
@@ -872,12 +858,12 @@ For a 2D tensor:
 
 Since transpose is its own inverse, the backward operation is also transpose:
 
-[
+$$
 \frac{\partial L}{\partial A}
-=============================
+=
 
 \left(\frac{\partial L}{\partial A^T}\right)^T
-]
+$$
 
 ---
 
@@ -900,21 +886,21 @@ y = x.relu()
 
 Computes:
 
-[
+$$
 \operatorname{ReLU}(x)=\max(0,x)
-]
+$$
 
 Derivative:
 
-[
+$$
 \frac{d}{dx}\operatorname{ReLU}(x)
-==================================
+=
 
 \begin{cases}
 1 & x>0\
 0 & x\leq0
 \end{cases}
-]
+$$
 
 The implementation constructs a binary gradient mask.
 
@@ -943,30 +929,30 @@ y = x.tanh()
 
 Computes:
 
-[
+$$
 \tanh(x)
-]
+$$
 
 Derivative:
 
-[
+$$
 \frac{d}{dx}\tanh(x)
-====================
+=
 
 1-\tanh^2(x)
-]
+$$
 
 Since the output is already:
 
-[
+$$
 y=\tanh(x)
-]
+$$
 
 the backward pass can use:
 
-[
+$$
 1-y^2
-]
+$$
 
 directly.
 

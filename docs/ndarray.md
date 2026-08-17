@@ -473,9 +473,9 @@ negates every element.
 
 Computes:
 
-[
+$$
 e^x
-]
+$$
 
 elementwise.
 
@@ -729,7 +729,3 @@ Reductions
 Autograd is implemented at the `Tensor`/operation level on top of `Array`.
 
 This separation allows `kerze` to use `Array` as a lightweight numerical backend while `Tensor` adds computation graphs and automatic differentiation.
-
-```
-
-```
