@@ -20,6 +20,7 @@ from typing import Callable, List, Optional, Set, Tuple, Union
 
 from .ndarray import Array, NestedList
 
+TensorLike = Union["Tensor", Array, float, int]
 
 class Tensor:
     """
@@ -155,7 +156,7 @@ class Tensor:
             node._backward()
 
     # OPERATIONS
-    def __add__(self, other: "Tensor") -> "Tensor":
+    def __add__(self, other: TensorLike) -> "Tensor":
         """
         Operator overload for `self + other`.
  
@@ -175,14 +176,14 @@ class Tensor:
         from .ops import add
         return add(self, other)
 
-    def __radd__(self, other):
+    def __radd__(self, other: TensorLike) -> "Tensor":
         """
         Operator overload for `other + self`.
         """
         from .ops import add
         return add(self, other)
 
-    def __sub__(self, other: "Tensor") -> "Tensor":
+    def __sub__(self, other: TensorLike) -> "Tensor":
         """
         Operator overload for `self - other`.
  
@@ -202,14 +203,14 @@ class Tensor:
         from .ops import sub
         return sub(self, other)
     
-    def __rsub__(self, other):
+    def __rsub__(self, other: TensorLike) -> "Tensor":
         """
         Operator overload for `other - self`.
         """
         from .ops import sub
         return sub(other, self)
  
-    def __mul__(self, other: "Tensor") -> "Tensor":
+    def __mul__(self, other: TensorLike) -> "Tensor":
         """
         Operator overload for `self * other` (elementwise multiplication).
  
@@ -229,7 +230,7 @@ class Tensor:
         from .ops import mul
         return mul(self, other)
 
-    def __rmul__(self, other):
+    def __rmul__(self, other: TensorLike) -> "Tensor":
         """
         Operator overload for `other * self` (elementwise multiplication).
         """
@@ -253,7 +254,7 @@ class Tensor:
         from .ops import neg
         return neg(self)
 
-    def __truediv__(self, other):
+    def __truediv__(self, other: TensorLike) -> "Tensor":
         """
         Operator overload for `self / other` (elementwise division).
     
@@ -273,7 +274,7 @@ class Tensor:
         from .ops import div
         return div(self, other)
 
-    def __rtruediv__(self, other):
+    def __rtruediv__(self, other: TensorLike) -> "Tensor":
         """
         Operator overload for `other / self` (elementwise division).
         """
@@ -282,7 +283,7 @@ class Tensor:
 
     def __pow__(self, exponent: float):
         """
-        Operator overload for `self / other` (elementwise division).
+        Operator overload for `self ** exponent` (elementwise power).
             
         Args:
             other: The Tensor to divide with this one, elementwise.
@@ -396,6 +397,38 @@ class Tensor:
         """
         from .ops import max
         return max(self)
+    
+
+    #-------------------------------MatMul Functions--------------------------------
+    def matmul(self, other: TensorLike) -> "Tensor":
+        """Matrix multiplication: self @ other. See ops.matmul."""
+        from .ops import matmul
+        return matmul(self, other)
+
+    def __matmul__(self, other: TensorLike) -> "Tensor":
+        from .ops import matmul
+        return matmul(self, other)
+
+    def __rmatmul__(self, other: TensorLike) -> "Tensor":
+        from .ops import matmul
+        return matmul(other, self)
+
+    @property
+    def T(self) -> "Tensor":
+        """Full-axis transpose (matches Array.transpose). Only correct as a
+        matrix transpose for 2D Tensors — see ops.transpose docstring."""
+        from .ops import transpose
+        return transpose(self)
+
+    def relu(self) -> "Tensor":
+        """Elementwise ReLU: max(self, 0). See ops.relu."""
+        from .ops import relu
+        return relu(self)
+
+    def tanh(self) -> "Tensor":
+        """Elementwise tanh, via Array.tanh() directly. See `ops.tanh`."""
+        from .ops import tanh
+        return tanh(self)
     #-------------------------------Comparison--------------------------------
 
     def __eq__(self, other: object) -> bool:
@@ -407,100 +440,3 @@ class Tensor:
         equal. Use `tensor.data.allclose(other.data)` to compare values.
         """
         return self is other
-
-    #--------------------------------Activation Functions--------------------------------
-
-    def relu(self) -> "Tensor":
-        """
-        Elementwise ReLU (Rectified Linear Unit) activation of this tensor.
-
-        Returns:
-            A new Tensor holding `max(0, self.data)` (elementwise), with
-            `requires_grad=True` if this tensor requires grad, and a
-            `_backward` closure wired to accumulate gradient into this
-            tensor using the chain rule.
-        """
-        from .ops import relu
-        return relu(self)
-
-    def sigmoid(self) -> "Tensor":
-        """
-        Elementwise sigmoid activation of this tensor.
-
-        Returns:
-            A new Tensor holding `1 / (1 + exp(-self.data))` (elementwise),
-            with `requires_grad=True` if this tensor requires grad, and a
-            `_backward` closure wired to accumulate gradient into this
-            tensor using the chain rule.
-        """
-        from .ops import sigmoid
-        return sigmoid(self)
-
-    def tanh(self) -> "Tensor":
-        """
-        Elementwise hyperbolic tangent activation of this tensor.
-
-        Returns:
-            A new Tensor holding `tanh(self.data)` (elementwise), with
-            `requires_grad=True` if this tensor requires grad, and a
-            `_backward` closure wired to accumulate gradient into this
-            tensor using the chain rule.
-        """
-        from .ops import tanh
-        return tanh(self)
-
-    def gelu(self) -> "Tensor":
-        """
-        Elementwise GELU (Gaussian Error Linear Unit) activation of this tensor.
-
-        Returns:
-            A new Tensor holding `0.5 * self.data * (1 + tanh(sqrt(2/pi) * (self.data + 0.044715 * self.data^3)))` (elementwise),
-            with `requires_grad=True` if this tensor requires grad, and a
-            `_backward` closure wired to accumulate gradient into this
-            tensor using the chain rule.
-        """
-        from .ops import gelu
-        return gelu(self)   
-
-
-    #-------------------------------------Loss Functions-------------------------------------
-
-    def MSE_Loss(self, target: "Tensor") -> "Tensor":
-        """
-        Mean Squared Error loss between this tensor and the target tensor.
-
-        Args:
-            target: The target tensor to compare against. Must have the same shape.
-
-        Returns:
-            A new Tensor holding the mean squared error loss, with `requires_grad=True` if this tensor requires grad, and a 
-            `_backward` closure wired to accumulate gradient into this tensor using the chain rule.
-        """
-        from .ops import MSE_Loss
-        return MSE_Loss(self, target)
-
-    def CrossEntropy_Loss(self, target: "Tensor") -> "Tensor":
-        """
-        Cross-Entropy loss between this tensor (logits) and the target tensor (labels).
-
-        Args:
-            target: The target tensor containing class labels. Must have the same shape as this tensor.
-
-        Returns:
-            A new Tensor holding the cross-entropy loss, with `requires_grad=True` if this tensor requires grad, and a `_backward` closure wired to accumulate gradient into this tensor using the chain rule.
-        """
-        from .ops import CrossEntropy_Loss
-        return CrossEntropy_Loss(self, target)
-
-    def BCE_Loss(self, target: "Tensor") -> "Tensor":
-        """
-        Binary Cross-Entropy loss between this tensor (predictions) and the target tensor (labels).
-
-        Args:
-            target: The target tensor containing binary labels. Must have the same shape as this tensor.
-
-        Returns:
-            A new Tensor holding the binary cross-entropy loss, with `requires_grad=True` if this tensor requires grad, and a `_backward` closure wired to accumulate gradient into this tensor using the chain rule.
-        """
-        from .ops import BCE_Loss
-        return BCE_Loss(self, target)

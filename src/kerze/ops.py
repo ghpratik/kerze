@@ -687,97 +687,84 @@ def max(a: Tensor, axis: int = None, keepdims: bool = False) -> Tensor:
     out._backward = _backward
     return out
 
-
-#---------------------------------------Activation Functions---------------------------------------
-
-def relu(a: Tensor) -> Tensor:
+def matmul(a: Tensor, b: Tensor) -> Tensor:
     """
-    Elementwise ReLU activation: out = max(0, a). Unary — no broadcasting
-    involved.
+    Matrix multiplication: out = a @ b. Delegates to Array.matmul
+    (2D@2D or matching-batch 3D@3D).
 
-    Backward:
-        d(out)/d(a) = 1 if a > 0 else 0, so gradient flowing to `a` is
-        (incoming_grad * (a.data > 0)).
+    Backward: d(out)/d(a) = out.grad @ b.T, d(out)/d(b) = a.T @ out.grad.
+    Caveat: Array.transpose() reverses ALL axes, so this backward rule
+    is only verified for 2D operands — the only case Linear needs.
     """
-    out_data = [math.max(0, x) for x in a.data.data]
-    out = Tensor(
-        out_data,
-        requires_grad=a.requires_grad,
-        _children=(a,),
-        _op="relu",
-    )
+    a = _ensure_tensor(a)
+    b = _ensure_tensor(b)
+    out_data = a.data @ b.data
+    out = Tensor(out_data, requires_grad=(a.requires_grad or b.requires_grad),
+                 _children=(a, b), _op="matmul")
 
     def _backward() -> None:
         if a.requires_grad:
-            if a.grad is None:
-                a.zero_grad()
-            a.grad += (a.data > 0) * out.grad
+            if a.grad is None: a.zero_grad()
+            a.grad += out.grad @ b.data.transpose()
+        if b.requires_grad:
+            if b.grad is None: b.zero_grad()
+            b.grad += a.data.transpose() @ out.grad
 
     out._backward = _backward
     return out
 
-def sigmoid(a: Tensor) -> Tensor:
-    """
-    Elementwise Sigmoid activation: out = 1 / (1 + exp(-a)). Unary — no broadcasting
-    involved.
 
-    Backward:
-        d(out)/d(a) = out * (1 - out), so gradient flowing to `a` is
-        (incoming_grad * out.data * (1 - out.data)).
-    """
-    out_data = 1 / (1 + (-a.data).exp())
-    out = Tensor(
-        out_data,
-        requires_grad=a.requires_grad,
-        _children=(a,),
-        _op="sigmoid",
-    )
+def transpose(a: Tensor) -> Tensor:
+    """Full-axis transpose. Backward: transpose is its own inverse, so
+    gradient flowing back is out.grad transposed the same way."""
+    out_data = a.data.transpose()
+    out = Tensor(out_data, requires_grad=a.requires_grad,
+                 _children=(a,), _op="transpose")
 
     def _backward() -> None:
         if a.requires_grad:
-            if a.grad is None:
-                a.zero_grad()
-            a.grad += out.data * (1 - out.data) * out.grad
+            if a.grad is None: a.zero_grad()
+            a.grad += out.grad.transpose()
+
+    out._backward = _backward
+    return out
+
+
+def relu(a: Tensor) -> Tensor:
+    """
+    Elementwise ReLU: out = max(a, 0).
+    Array has no elementwise scalar comparison, so forward/mask are
+    built directly from the flat buffer rather than an Array method.
+    """
+    out_arr = Array([x if x > 0 else 0.0 for x in a.data.data], shape=a.data.shape)
+    out = Tensor(out_arr, requires_grad=a.requires_grad,
+                 _children=(a,), _op="relu")
+
+    def _backward() -> None:
+        if a.requires_grad:
+            if a.grad is None: a.zero_grad()
+            mask = Array([1.0 if x > 0 else 0.0 for x in a.data.data], shape=a.data.shape)
+            a.grad += mask * out.grad
 
     out._backward = _backward
     return out
 
 def tanh(a: Tensor) -> Tensor:
     """
-    Elementwise Tanh activation: out = tanh(a). Unary — no broadcasting
-    involved.
+    Elementwise hyperbolic tangent: out = tanh(a).
+    Uses Array.tanh() directly (numerically stable) rather than the
+    exp-based composition — that form overflows for large |x|.
 
-    Backward:
-        d(out)/d(a) = 1 - out^2, so gradient flowing to `a` is
-        (incoming_grad * (1 - out.data ** 2)).
+    Backward: d(out)/d(a) = 1 - tanh(a)^2 = 1 - out^2.
     """
     out_data = a.data.tanh()
-    out = Tensor(
-        out_data,
-        requires_grad=a.requires_grad,
-        _children=(a,),
-        _op="tanh",
-    )
+    out = Tensor(out_data, requires_grad=a.requires_grad,
+                 _children=(a,), _op="tanh")
 
     def _backward() -> None:
         if a.requires_grad:
-            if a.grad is None:
-                a.zero_grad()
+            if a.grad is None: a.zero_grad()
             a.grad += (1 - out.data ** 2) * out.grad
 
     out._backward = _backward
     return out
-
-def gelu(a: Tensor) -> Tensor:
-    """
-    Elementwise GELU activation: out = 0.5 * a * (1 + tanh(sqrt(2/pi) * (a + 0.044715 * a^3))). Unary — no broadcasting
-    involved.
-
-    Backward:
-        No _backward() inside GELU. Computation graph will automatically calculate the gradient using the chain rule, so we don't need to manually implement the backward pass here.
-    """
-    c = math.sqrt(2.0 / math.pi)
-
-    u = c * (a + 0.044715 * a**3)
-
-    return 0.5 * a * (1.0 + tanh(u))

@@ -711,3 +711,19 @@ class Array:
     def __repr__(self) -> str:
         """Concise developer-facing repr showing data and shape."""
         return f"Array(data={self._unflatten(self.data, self.shape)}, shape={self.shape})"
+
+#---------------------------------------Comparison Operators-----------------------------------------------------------
+
+    def __eq__(self, other) -> "Array":
+        if not isinstance(other, Array):
+            other = Array(other)
+
+        if self.shape != other.shape:
+            other = other.broadcast_to(self.shape)
+
+        data = [
+            1.0 if a == b else 0.0
+            for a, b in zip(self.data, other.data)
+        ]
+
+        return Array(data, shape=self.shape)
