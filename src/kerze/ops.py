@@ -689,25 +689,42 @@ def max(a: Tensor, axis: int = None, keepdims: bool = False) -> Tensor:
 
 def matmul(a: Tensor, b: Tensor) -> Tensor:
     """
-    Matrix multiplication: out = a @ b. Delegates to Array.matmul
-    (2D@2D or matching-batch 3D@3D).
+    Matrix multiplication: out = a @ b.
 
-    Backward: d(out)/d(a) = out.grad @ b.T, d(out)/d(b) = a.T @ out.grad.
-    Caveat: Array.transpose() reverses ALL axes, so this backward rule
-    is only verified for 2D operands — the only case Linear needs.
+    Forward:
+        Delegates to Array.matmul — supports 2D@2D (m,k)@(k,n)->(m,n)
+        and matching-batch 3D@3D. General N-D broadcasting matmul is
+        not supported (same scope limit as Array.matmul).
+
+    Backward (standard matmul gradient rule):
+        d(out)/d(a) = out.grad @ b.T
+        d(out)/d(b) = a.T @ out.grad
+
+    Example:
+        >>> a = Tensor([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)  # (2,2)
+        >>> b = Tensor([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)  # (2,2)
+        >>> out = matmul(a, b)
+        >>> out.data.data
+        [19.0, 22.0, 43.0, 50.0]
     """
     a = _ensure_tensor(a)
     b = _ensure_tensor(b)
     out_data = a.data @ b.data
-    out = Tensor(out_data, requires_grad=(a.requires_grad or b.requires_grad),
-                 _children=(a, b), _op="matmul")
+    out = Tensor(
+        out_data,
+        requires_grad=(a.requires_grad or b.requires_grad),
+        _children=(a, b),
+        _op="matmul",
+    )
 
     def _backward() -> None:
         if a.requires_grad:
-            if a.grad is None: a.zero_grad()
+            if a.grad is None:
+                a.zero_grad()
             a.grad += out.grad @ b.data.transpose()
         if b.requires_grad:
-            if b.grad is None: b.zero_grad()
+            if b.grad is None:
+                b.zero_grad()
             b.grad += a.data.transpose() @ out.grad
 
     out._backward = _backward
@@ -715,15 +732,33 @@ def matmul(a: Tensor, b: Tensor) -> Tensor:
 
 
 def transpose(a: Tensor) -> Tensor:
-    """Full-axis transpose. Backward: transpose is its own inverse, so
-    gradient flowing back is out.grad transposed the same way."""
+    """
+    Full-axis transpose: out = a with every axis order reversed,
+    matching Array.transpose() exactly. For a 2D Tensor this is the
+    standard matrix transpose.
+
+    Backward:
+        Transpose is its own inverse, so gradient flowing back to `a`
+        is simply out.grad transposed the same way.
+
+    Example:
+        >>> a = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)  # (2,3)
+        >>> out = transpose(a)   # (3,2)
+        >>> out.shape
+        (3, 2)
+    """
     out_data = a.data.transpose()
-    out = Tensor(out_data, requires_grad=a.requires_grad,
-                 _children=(a,), _op="transpose")
+    out = Tensor(
+        out_data,
+        requires_grad=a.requires_grad,
+        _children=(a,),
+        _op="transpose",
+    )
 
     def _backward() -> None:
         if a.requires_grad:
-            if a.grad is None: a.zero_grad()
+            if a.grad is None:
+                a.zero_grad()
             a.grad += out.grad.transpose()
 
     out._backward = _backward
@@ -733,38 +768,131 @@ def transpose(a: Tensor) -> Tensor:
 def relu(a: Tensor) -> Tensor:
     """
     Elementwise ReLU: out = max(a, 0).
-    Array has no elementwise scalar comparison, so forward/mask are
-    built directly from the flat buffer rather than an Array method.
+
+    Forward:
+        Array has no elementwise-max-with-scalar method, so this is
+        built directly from the flat buffer: out[i] = max(a.data[i], 0).
+
+    Backward:
+        d(out)/d(a_i) = 1 where a_i > 0, else 0 (subgradient 0 at
+        a_i == 0). Array also has no elementwise `>` comparison, so the
+        mask is built the same way — directly from the flat buffer.
+
+    Example:
+        >>> a = Tensor([-1.0, 0.0, 2.0], requires_grad=True)
+        >>> out = relu(a)
+        >>> out.data.data
+        [0.0, 0.0, 2.0]
+        >>> out.backward()
+        >>> a.grad.data
+        [0.0, 0.0, 1.0]
     """
     out_arr = Array([x if x > 0 else 0.0 for x in a.data.data], shape=a.data.shape)
-    out = Tensor(out_arr, requires_grad=a.requires_grad,
-                 _children=(a,), _op="relu")
+    out = Tensor(
+        out_arr,
+        requires_grad=a.requires_grad,
+        _children=(a,),
+        _op="relu",
+    )
 
     def _backward() -> None:
         if a.requires_grad:
-            if a.grad is None: a.zero_grad()
-            mask = Array([1.0 if x > 0 else 0.0 for x in a.data.data], shape=a.data.shape)
+            if a.grad is None:
+                a.zero_grad()
+            mask = Array(
+                [1.0 if x > 0 else 0.0 for x in a.data.data], shape=a.data.shape
+            )
             a.grad += mask * out.grad
 
     out._backward = _backward
     return out
 
+
 def tanh(a: Tensor) -> Tensor:
     """
     Elementwise hyperbolic tangent: out = tanh(a).
-    Uses Array.tanh() directly (numerically stable) rather than the
-    exp-based composition — that form overflows for large |x|.
 
-    Backward: d(out)/d(a) = 1 - tanh(a)^2 = 1 - out^2.
+    Uses Array.tanh() directly (numerically stable) rather than the
+    exp-based composition (e^x - e^-x)/(e^x + e^-x) — that form
+    overflows for large |x| before the division stabilizes it.
+
+    Backward:
+        d(out)/d(a) = 1 - tanh(a)^2 = 1 - out^2.
+
+    Example:
+        >>> a = Tensor([0.0], requires_grad=True)
+        >>> out = tanh(a)
+        >>> out.backward()
+        >>> a.grad.data   # d(tanh(x))/dx at x=0 is 1
+        [1.0]
     """
     out_data = a.data.tanh()
-    out = Tensor(out_data, requires_grad=a.requires_grad,
-                 _children=(a,), _op="tanh")
+    out = Tensor(
+        out_data,
+        requires_grad=a.requires_grad,
+        _children=(a,),
+        _op="tanh",
+    )
 
     def _backward() -> None:
         if a.requires_grad:
-            if a.grad is None: a.zero_grad()
+            if a.grad is None:
+                a.zero_grad()
             a.grad += (1 - out.data ** 2) * out.grad
+
+    out._backward = _backward
+    return out
+
+
+def select_index(a: Tensor, indices) -> Tensor:
+    """
+    Row-wise index select: out[i] = a[i, indices[i]].
+
+    The "gather" operation needed to pick out a target class's
+    logit/log-prob per row for classification losses (CrossEntropyLoss,
+    NLLLoss). Nothing else in ops.py does discrete indexing.
+
+    Args:
+        a: Tensor of shape (batch, num_classes).
+        indices: A plain list/tuple of `batch` Python ints, each in
+            [0, num_classes) — NOT a Tensor. These are class labels,
+            not something ever differentiated with respect to.
+
+    Forward:
+        out[i] = a.data[i, indices[i]], shape (batch,).
+
+    Backward:
+        d(out[i])/d(a[i,j]) = 1 if j == indices[i] else 0 — gradient
+        flowing back to `a` is zero everywhere except position
+        (i, indices[i]), which receives out.grad[i]. Implemented via
+        Array.get/set directly (no Array-level gather exists).
+
+    Example:
+        >>> logits = Tensor([[1.0, 2.0, 0.5], [0.1, 0.2, 5.0]], requires_grad=True)
+        >>> picked = select_index(logits, [1, 2])   # logits[0,1], logits[1,2]
+        >>> picked.data.data
+        [2.0, 5.0]
+    """
+    batch, num_classes = a.shape
+    if len(indices) != batch:
+        raise ValueError(
+            f"select_index: expected {batch} indices (one per row), got {len(indices)}"
+        )
+    out_data = Array([a.data.get(i, indices[i]) for i in range(batch)], shape=(batch,))
+    out = Tensor(
+        out_data,
+        requires_grad=a.requires_grad,
+        _children=(a,),
+        _op="select_index",
+    )
+
+    def _backward() -> None:
+        if a.requires_grad:
+            if a.grad is None:
+                a.zero_grad()
+            for i in range(batch):
+                j = indices[i]
+                a.grad.set(a.grad.get(i, j) + out.grad.data[i], i, j)
 
     out._backward = _backward
     return out

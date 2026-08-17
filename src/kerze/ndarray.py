@@ -163,14 +163,24 @@ class Array:
         return Array(self.data, shape=new_shape)
 
     def transpose(self):
-        """Zero-copy transpose: reverses shape and strides, shares data buffer."""
+        """
+        Full-axis transpose: reverses the order of every axis.
+        Materializes a genuinely reordered, contiguous flat buffer (not a
+        zero-copy view) — every other operator on this class (__add__,
+        sum, exp, ...) reads self.data directly via zip()/list-comprehension
+        and assumes it's already contiguous row-major data matching
+        self.shape. A zero-copy view sharing the pre-transpose buffer while
+        only swapping shape/strides silently produces wrong results the
+        moment it hits any of those — only get()/set() are stride-aware.
+        """
         new_shape = tuple(reversed(self.shape))
-        new_strides = tuple(reversed(self.strides))
-        result = Array.__new__(Array)
-        result.data = self.data
-        result.shape = new_shape
-        result.strides = new_strides
-        return result
+        new_strides_for_read = self._compute_strides(new_shape)
+        result_data = [0.0] * self.size
+        for new_idx in itertools.product(*[range(d) for d in new_shape]):
+            old_idx = tuple(reversed(new_idx))
+            flat_pos = sum(i * s for i, s in zip(new_idx, new_strides_for_read))
+            result_data[flat_pos] = self.get(*old_idx)
+        return Array(result_data, shape=new_shape)
 
     def squeeze(self, axis: int = None) -> "Array":
         """

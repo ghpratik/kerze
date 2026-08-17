@@ -29,13 +29,39 @@ class MSELoss(Module):
         return "MSELoss()"
 
 
-# ADAPT — NOT YET IMPLEMENTED:
-# CrossEntropyLoss / NLLLoss need a way to *gather* per-row values at
-# target class indices (out[i, target[i]]) out of a Tensor. None of your
-# current ops support indexing/gather on a Tensor — that's a separate,
-# nontrivial primitive (forward: pick elements by index; backward:
-# scatter gradient back to just those positions, zero elsewhere).
-# Softmax itself is buildable today (exp + sum(axis=-1) + div, all
-# existing), it's specifically the "select the correct class's
-# probability per row" step that's missing. Worth tackling after
-# matmul/relu, once you're doing actual classification tasks.
+class NLLLoss(Module):
+    """
+    Negative log-likelihood loss. Expects log-probabilities as input
+    (typically from `F.log_softmax`), and integer class targets — NOT
+    a Tensor for `target`, matches PyTorch's convention.
+
+    Example:
+        >>> criterion = NLLLoss()
+        >>> log_probs = F.log_softmax(logits)
+        >>> loss = criterion(log_probs, target=[1, 0, 2])
+        >>> loss.backward()
+    """
+
+    def forward(self, log_probs, target):
+        return F.nll_loss(log_probs, target)
+
+    def __repr__(self) -> str:
+        return "NLLLoss()"
+
+
+class CrossEntropyLoss(Module):
+    """
+    Cross-entropy loss. Expects raw logits as input (applies
+    log_softmax internally) and integer class targets.
+
+    Example:
+        >>> criterion = CrossEntropyLoss()
+        >>> loss = criterion(logits, target=[1, 0, 2])
+        >>> loss.backward()
+    """
+
+    def forward(self, logits, target):
+        return F.cross_entropy(logits, target)
+
+    def __repr__(self) -> str:
+        return "CrossEntropyLoss()"

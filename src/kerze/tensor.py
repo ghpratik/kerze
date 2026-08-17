@@ -359,7 +359,7 @@ class Tensor:
 
     #----------------------------------Reduction Functions----------------------------------
 
-    def sum(self) -> "Tensor":
+    def sum(self, axis=None, keepdims: bool = False) -> "Tensor":
         """
         Elementwise sum of this tensor.
 
@@ -370,9 +370,9 @@ class Tensor:
             tensor using the chain rule.
         """
         from .ops import sum
-        return sum(self)
+        return sum(self, axis=axis, keepdims=keepdims)
 
-    def mean(self) -> "Tensor":
+    def mean(self, axis=None, keepdims: bool = False) -> "Tensor":
         """
         Elementwise mean of this tensor.
 
@@ -383,9 +383,9 @@ class Tensor:
             tensor using the chain rule.
         """
         from .ops import mean
-        return mean(self)
+        return mean(self, axis=axis, keepdims=keepdims)
 
-    def max(self) -> "Tensor":
+    def max(self, axis=None, keepdims: bool = False) -> "Tensor":
         """
         Elementwise max of this tensor.
 
@@ -396,7 +396,11 @@ class Tensor:
             tensor using the chain rule.
         """
         from .ops import max
-        return max(self)
+        return max(self, axis=axis, keepdims=keepdims)
+
+    def select(self, indices):
+        from .ops import select_index
+        return select_index(self, indices)
     
 
     #-------------------------------MatMul Functions--------------------------------
@@ -440,3 +444,14 @@ class Tensor:
         equal. Use `tensor.data.allclose(other.data)` to compare values.
         """
         return self is other
+
+    # def matmul(self, other): from .ops import matmul; return matmul(self, other)
+    # def __matmul__(self, other): from .ops import matmul; return matmul(self, other)
+    # def __rmatmul__(self, other): from .ops import matmul; return matmul(other, self)
+
+    # @property
+    # def T(self): from .ops import transpose; return transpose(self)
+
+    # def relu(self): from .ops import relu; return relu(self)
+    # def tanh(self): from .ops import tanh; return tanh(self)
+    # def select(self, indices): from .ops import select_index; return select_index(self, indices)

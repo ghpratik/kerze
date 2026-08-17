@@ -171,10 +171,20 @@ class TestTranspose:
         t = arr.transpose()
         assert t.shape == (3, 2)
 
-    def test_transpose_strides_reversed(self):
-        arr = Array([[1, 2, 3], [4, 5, 6]])  # strides (3, 1)
+    def test_transpose_values_correct_via_get(self):
+        arr = Array([[1, 2, 3], [4, 5, 6]])  # shape (2,3)
+        t = arr.transpose()                   # shape (3,2)
+        assert t.shape == (3, 2)
+        assert [[t.get(i, j) for j in range(2)] for i in range(3)] == [[1, 4], [2, 5], [3, 6]]
+
+    def test_transpose_safe_with_arithmetic(self):
+        # this is the actual bug we're guarding against: transpose() used
+        # to share the flat buffer without reordering it, which silently
+        # broke any arithmetic op run on the result
+        arr = Array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
         t = arr.transpose()
-        assert t.strides == (1, 3)
+        result = Array.zeros((3, 2)) + t
+        assert result.data == [1.0, 4.0, 2.0, 5.0, 3.0, 6.0]
 
     def test_transpose_values_correct(self):
         arr = Array([[1, 2, 3], [4, 5, 6]])
@@ -184,11 +194,11 @@ class TestTranspose:
             for j in range(arr.shape[1]):
                 assert arr.get(i, j) == t.get(j, i)
 
-    def test_transpose_is_zero_copy(self):
-        arr = Array([[1, 2, 3], [4, 5, 6]])
-        t = arr.transpose()
-        # Same underlying flat buffer object, not a copy.
-        assert t.data is arr.data
+    def test_transpose_arithmetic_is_correct(self):
+        a = Array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        t = a.transpose()
+        result = Array.zeros((3, 2)) + t
+        assert result.data == [1.0, 4.0, 2.0, 5.0, 3.0, 6.0]
 
     def test_transpose_of_transpose_is_original_shape(self):
         arr = Array([[1, 2, 3], [4, 5, 6]])

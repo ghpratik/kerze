@@ -27,6 +27,21 @@ class ReLU(Module):
         return "ReLU()"
 
 
+class GELU(Module):
+    """
+    Gaussian Error Linear Unit (tanh approximation). Smoother than ReLU
+    — commonly used in transformer feedforward blocks (BERT, GPT).
+    Fully working today, built from existing primitives — see
+    F.gelu / ops.tanh.
+    """
+
+    def forward(self, x):
+        return F.gelu(x)
+
+    def __repr__(self) -> str:
+        return "GELU()"
+
+
 class Sigmoid(Module):
     """Elementwise sigmoid: 1 / (1 + exp(-x)). Fully working today."""
 
@@ -45,11 +60,3 @@ class Tanh(Module):
 
     def __repr__(self) -> str:
         return "Tanh()"
-
-class GELU(Module):
-    """Gaussian Error Linear Unit (tanh approximation). Smoother than
-    ReLU — the standard choice in transformer feedforward blocks."""
-    def forward(self, x):
-        return F.gelu(x)
-    def __repr__(self):
-        return "GELU()"

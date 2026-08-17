@@ -10,7 +10,7 @@ from kerze.nn.module import Module
 from kerze.nn.parameter import Parameter
 from kerze.nn.linear import Linear
 from kerze.nn.activation import ReLU, GELU, Sigmoid, Tanh
-from kerze.nn.loss import MSELoss
+from kerze.nn.loss import MSELoss, NLLLoss, CrossEntropyLoss
 from kerze.nn.container import Sequential
 from kerze.nn import functional
 from kerze.nn import init
@@ -24,6 +24,8 @@ __all__ = [
     "Sigmoid",
     "Tanh",
     "MSELoss",
+    "NLLLoss",
+    "CrossEntropyLoss",
     "Sequential",
     "functional",
     "init",
