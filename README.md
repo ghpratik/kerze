@@ -1,54 +1,163 @@
-minitorch-lib/ # top-level repo (rename per your final name choice)
-├── README.md # project pitch, install, quickstart, benchmark numbers
-├── LICENSE # MIT is standard for this kind of project
-├── pyproject.toml # package metadata for PyPI (name, version, deps=[])
-├── .github/
-│ └── workflows/
-│ └── test.yml # CI: run pytest on push
-│
-├── src/
-│ └── minitorch/ # actual importable package
-│ ├── **init**.py # exposes public API: Tensor, nn, optim
-│ │
-│ ├── ndarray.py # NDArray: flat buffer + shape + strides
-│ │ # - get/set, reshape, transpose (stride tricks)
-│ │
-│ ├── tensor.py # Tensor: autograd wrapper around NDArray
-│ │ # - data, grad, requires_grad, \_backward, \_prev
-│ │ # - backward() — topological sort + chain rule
-│ │
-│ ├── ops.py # forward+backward pairs, the core math
-│ │ # - add, mul, matmul, sum, mean, reshape, transpose
-│ │ # - relu, sigmoid, exp, log
-│ │ # - broadcast_shapes(), unbroadcast() helpers
-│ │
-│ ├── nn/
-│ │ ├── **init**.py
-│ │ ├── module.py # base Module class (params, zero_grad)
-│ │ ├── linear.py # Linear layer
-│ │ ├── activations.py # ReLU, Sigmoid as Module wrappers
-│ │ └── losses.py # MSELoss, CrossEntropyLoss
-│ │
-│ └── optim.py # SGD, Adam optimizers
-│
-├── tests/
-│ ├── test_ndarray.py # shape/stride correctness, get/set, transpose
-│ ├── test_ops.py # forward correctness for each op
-│ ├── test_gradients.py # numerical gradient checking — YOUR KEY PROOF FILE
-│ ├── test_broadcast.py # dedicated tests for the hardest part
-│ └── test_nn.py # Linear layer, loss functions end-to-end
-│
-├── examples/
-│ ├── mnist_train.py # the flagship demo — trains an MLP on MNIST
-│ ├── xor_toy.py # tiny sanity-check example (fast, good for README gif/demo)
-│ └── benchmark.py # timing comparison vs numpy/torch (optional, for README numbers)
-│
-└── docs/
-└── design_notes.md # your own write-up: strides, broadcasting derivation, # matmul backward derivation — this doubles as interview prep
+# kerze
 
-## Commands to upload package
+A lightweight, educational PyTorch-like machine learning library built from scratch in Python.
 
-`pip install build twine --break-system-packages
-python3 -m build
-twine upload --repository testpypi dist/*   # test first
-twine upload dist/*                          # then the real thing`
+**kerze** combines a small NumPy-inspired multidimensional array implementation with an automatic differentiation engine and a neural-network API.
+
+The project is designed to make the internals of numerical computing and deep learning easier to understand by keeping the implementation small, explicit, and readable.
+
+> kerze is primarily an educational and experimental project, not a replacement for NumPy, PyTorch, or other production-grade numerical computing frameworks.
+
+---
+
+## Features
+
+- NumPy-inspired multidimensional `Array`
+- Broadcasting
+- Elementwise arithmetic operations
+- Matrix multiplication
+- Reductions such as `sum`, `mean`, and `max`
+- Reshape, transpose, squeeze, and other shape operations
+- Automatic differentiation
+- Reverse-mode backpropagation
+- Computation graphs
+- Gradient accumulation
+- Gradient broadcasting / unbroadcasting
+- Basic mathematical operations
+- Activation functions
+- Neural-network modules
+- Learnable `Parameter`s
+- `Sequential` models
+- Linear layers
+- Loss functions
+- Functional neural-network API
+- Parameter initialization
+- Training/evaluation modes
+- PyTorch-like API design
+
+---
+
+# Installation
+
+## Install with pip
+
+If kerze is published on PyPI, install it with:
+
+```bash
+pip install kerze
+```
+
+### From Source
+
+```bash
+git clone https://github.com/ghpratik/kerze.git
+cd kerze
+pip install -e .
+```
+
+## Overview
+
+Kerze is organized into three main layers:
+
+```text
+Array
+  ↓
+Tensor + Autograd
+  ↓
+nn
+```
+
+- **`Array`** — NumPy-like multidimensional array and mathematical operations.
+- **`Tensor`** — wraps `Array` and adds automatic differentiation.
+- **`nn`** — PyTorch-like neural-network building blocks.
+
+Example:
+
+```python
+from kerze import Tensor, nn
+
+model = nn.Sequential(
+    nn.Linear(3, 8),
+    nn.ReLU(),
+    nn.Linear(8, 1),
+)
+
+x = Tensor([[1.0, 2.0, 3.0]], requires_grad=True)
+y = model(x)
+
+loss = y.mean()
+loss.backward()
+```
+
+## Neural Network API
+
+Kerze provides a small PyTorch-inspired `nn` API:
+
+```python
+nn.Module
+nn.Parameter
+nn.Linear
+
+nn.ReLU
+nn.GELU
+nn.Sigmoid
+nn.Tanh
+
+nn.MSELoss
+nn.NLLLoss
+nn.CrossEntropyLoss
+
+nn.Sequential
+```
+
+Functional operations are available through:
+
+```python
+from kerze.nn import functional as F
+```
+
+## Autograd
+
+Kerze builds a computation graph during tensor operations and traverses it backwards during:
+
+```python
+loss.backward()
+```
+
+Each operation defines its own backward rule, allowing gradients to propagate through arithmetic, reductions, activations, matrix multiplication, and other supported operations.
+
+### Autograd Graph
+
+<!-- Place the autograd tree/demo image here -->
+
+![Kerze Autograd Graph](docs/images/autograd-tree.png)
+
+## Scope & Limitations
+
+Kerze is intentionally **small and educational**.
+
+- CPU only
+- No GPU/CUDA support
+- No optimized C/C++ kernels
+- Limited NumPy compatibility
+- Limited neural-network layers
+- No optimizers yet / limited optimizer support
+- No distributed training
+- No production-scale performance guarantees
+- Some operations support a smaller set of shapes/features than NumPy/PyTorch
+
+The implementation prioritizes **clarity and understanding of the underlying mechanics** over performance and completeness.
+
+## Documentation
+
+Detailed documentation is available in [`docs/`](docs/):
+
+- [`Array`](docs/ndarray.md)
+- [`Tensor & Autograd`](docs/tensor.md)
+- [`Neural Networks`](docs/nn.md)
+
+## Status
+
+Kerze is an experimental/learning project and is actively evolving.
+
+> ⚠️ **Warning:** Kerze currently supports **CPU execution only**. There is **no GPU/CUDA support**.
