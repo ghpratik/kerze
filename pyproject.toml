@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
-    { name = "Pratik", email = "your-email@example.com" }
+    { name = "Pratik", email = "pratik2000gaikwad@gmail.com" }
 ]
 keywords = ["autograd", "tensor", "deep-learning", "machine-learning", "neural-network", "from-scratch"]
 classifiers = [
@@ -38,9 +38,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-username/kerze"
-Repository = "https://github.com/your-username/kerze"
-Issues = "https://github.com/your-username/kerze/issues"
+Homepage = "https://github.com/ghpratik/kerze"
+Repository = "https://github.com/ghpratik/kerze"
+Issues = "https://github.com/ghpratik/kerze/issues"
 
 # ---------------------------------------------------------------------------
 # Hatchling build config — tells the build backend where your actual
