@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerze"
-version = "0.0.1"
+version = "1.0.0"
 description = "A pure-Python, zero-dependency tensor/autograd library built from scratch."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
-    { name = "Pratik", email = "pratik2000gaikwad@gmail.com" }
+    { name = "Pratik Gaikwad", email = "pratik2000gaikwad@gmail.com" }
 ]
 keywords = ["autograd", "tensor", "deep-learning", "machine-learning", "neural-network", "from-scratch"]
 classifiers = [
