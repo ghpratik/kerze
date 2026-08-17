@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ghpratik/kerze/assets/logo.svg" alt="kerze Logo" width="200"/>
+  <img
+    src="https://raw.githubusercontent.com/ghpratik/kerze/main/assets/logo.svg"
+    width="160"
+    alt="Kerze logo"
+  >
 </p>
 
 # kerze
