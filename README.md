@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ghpratik/kerze/assets/logo.svg" alt="kerze Logo" width="200"/>
+</p>
+
 # kerze
 
 A lightweight, PyTorch-like machine learning library built from scratch in Python.
@@ -11,8 +15,6 @@ The project is designed to make the internals of numerical computing and deep le
 # Installation
 
 ## Install with pip
-
-If kerze is published on PyPI, install it with:
 
 ```bash
 pip install kerze
@@ -35,7 +37,7 @@ Array
   ↓
 Tensor + Autograd
   ↓
-nn
+neural nets
 ```
 
 - **`Array`** — NumPy-like multidimensional array and mathematical operations.
