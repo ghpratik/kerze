@@ -48,6 +48,12 @@ neural nets
 - **`Tensor`** — wraps `Array` and adds automatic differentiation.
 - **`nn`** — PyTorch-like neural-network building blocks.
 
+## 🚀 Try Kerze
+
+Run a complete XOR neural network example in Google Colab:
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1THW9xk86iBDH4vgBQ9NS2qFVnl3Jl6sq?usp=sharing)
+
 Example:
 
 ```python

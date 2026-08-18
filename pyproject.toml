@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerze"
-version = "1.0.0"
+version = "1.0.1"
 description = "A pure-Python, zero-dependency tensor/autograd library built from scratch."
 readme = "README.md"
 requires-python = ">=3.9"
